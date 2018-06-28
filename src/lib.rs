@@ -2,6 +2,9 @@
 extern crate plygui_api;
 
 #[cfg(all(target_os = "windows", feature = "win32"))]
+#[macro_use]
+extern crate lazy_static;
+#[cfg(all(target_os = "windows", feature = "win32"))]
 mod lib_win32;
 #[cfg(all(target_os = "windows", feature = "win32"))]
 extern crate plygui_win32;
@@ -19,7 +22,7 @@ pub trait NewWebView {
 }
 
 pub mod imp {
-	//pub use inner_imp::WebView;
+	pub use inner_imp::WebView;
 }
 	
 pub mod development {

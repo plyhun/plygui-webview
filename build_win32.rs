@@ -11,4 +11,6 @@ pub fn main() {
 		.include("sys/win32")
 		.file("sys/win32/webview.cpp")
 		.compile("webview");
+		
+	println!("cargo:rustc-link-lib=dylib=uuid");	
 }

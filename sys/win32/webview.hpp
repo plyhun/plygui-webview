@@ -214,4 +214,6 @@ protected:
 extern "C" {
 	WebView * webview_new_with_parent(HWND parent);
 	void webview_delete(WebView * thisptr);
+	void webview_navigate(WebView * thisptr, wstring szUrl);
+	void webview_set_rect(WebView * thisptr, RECT rect);
 }

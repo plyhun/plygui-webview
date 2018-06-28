@@ -3,7 +3,9 @@
 WebView::WebView(HWND _hWndParent)
 {
 	iComRefCount = 0;
-	::SetRect(&rObject, -300, -300, 300, 300);
+	RECT rect;
+	GetClientRect(_hWndParent, &rect);
+	::SetRect(&rObject, rect.left, rect.top, rect.right, rect.bottom);
 	hWndParent = _hWndParent;
 
 	if (CreateBrowser() == FALSE)
@@ -13,7 +15,7 @@ WebView::WebView(HWND _hWndParent)
 
 	ShowWindow(GetControlWindow(), SW_SHOW);
 
-	this->Navigate(L"about:blank");
+	this->Navigate(L"https://google.com");
 }
 
 bool WebView::CreateBrowser()
@@ -34,8 +36,10 @@ bool WebView::CreateBrowser()
 	hr = oleObject->SetClientSite(this);
 	hr = OleSetContainedObject(oleObject, TRUE);
 
+	RECT rect;
+	GetClientRect(hWndParent, &rect);
 	RECT posRect;
-	::SetRect(&posRect, -300, -300, 300, 300);
+	::SetRect(&posRect, rect.left, rect.top, rect.right, rect.bottom);
 	hr = oleObject->DoVerb(OLEIVERB_INPLACEACTIVATE,
 		NULL, this, -1, hWndParent, &posRect);
 	if (FAILED(hr))
@@ -168,6 +172,11 @@ HRESULT STDMETHODCALLTYPE WebView::Exec(
       VARIANT *pvaIn,
       VARIANT *pvaOut
     ) {
+	if (nCmdID == OLECMDID_SHOWSCRIPTERROR) {
+		(*pvaOut).vt = VT_BOOL;
+		(*pvaOut).boolVal = VARIANT_TRUE;
+		return S_OK;
+	}
 	return S_OK;
 }
 
@@ -459,4 +468,10 @@ WebView * webview_new_with_parent(HWND parent) {
 }
 void webview_delete(WebView * thisptr) {
 	delete thisptr;
+}
+void webview_navigate(WebView * thisptr, wstring szUrl) {
+	thisptr->Navigate(szUrl);
+}
+void webview_set_rect(WebView * thisptr, RECT rect) {
+	thisptr->SetRect(rect);
 }
