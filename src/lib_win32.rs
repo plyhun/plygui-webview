@@ -85,10 +85,10 @@ impl ControlInner for WebViewWin32 {
                 w as i32 - rm - lm,
                 h as i32 - bm - tm,
                 self.base.hwnd,
-                winuser::WS_EX_CONTROLPARENT,
+                0,
                 WINDOW_CLASS.as_ptr(),
                 "",
-                winuser::WS_TABSTOP,
+                winuser::WS_TABSTOP | winuser::CS_HREDRAW | winuser::CS_VREDRAW,
                 selfptr,
                 None,
             )
@@ -220,22 +220,19 @@ impl Drawable for WebViewWin32 {
     }
 }
 
-/*
 #[allow(dead_code)]
 pub(crate) fn spawn() -> Box<controls::Control> {
 	use super::NewWebView;
 	
-    WebView::with_content().into_control()
+    WebView::new().into_control()
 }
-*/
 
 unsafe fn register_window_class() -> Vec<u16> {
     let class_name = OsStr::new("PlyguiWin32Browser")
         .encode_wide()
         .chain(Some(0).into_iter())
         .collect::<Vec<_>>();
-    let class = winuser::WNDCLASSEXW {
-        cbSize: mem::size_of::<winuser::WNDCLASSEXW>() as minwindef::UINT,
+    let class = winuser::WNDCLASSW {
         style: winuser::CS_DBLCLKS,
         lpfnWndProc: Some(whandler),
         cbClsExtra: 0,
@@ -246,9 +243,8 @@ unsafe fn register_window_class() -> Vec<u16> {
         hbrBackground: ptr::null_mut(),
         lpszMenuName: ptr::null(),
         lpszClassName: class_name.as_ptr(),
-        hIconSm: ptr::null_mut(),
     };
-    winuser::RegisterClassExW(&class);
+    winuser::RegisterClassW(&class);
     class_name
 }
 
