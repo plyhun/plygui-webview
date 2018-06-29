@@ -27,15 +27,20 @@ pub type WebView = Member<Control<WebViewWin32>>;
 extern "C" {
 	fn webview_new_with_parent(parent: windef::HWND) -> *mut OleWebView;
 	fn webview_delete(thisptr: *mut OleWebView);
-	fn webview_navigate(thisptr: *mut OleWebView, sz_url: *const c_void);
+	fn webview_navigate(thisptr: *mut OleWebView, sz_url: *const u16);
 	fn webview_set_rect(thisptr: *mut OleWebView, rect: windef::RECT);
+}
+
+enum State {
+	Attached(*mut OleWebView),
+	Unattached(String)
 }
 
 #[repr(C)]
 pub struct WebViewWin32 {
     base: common::WindowsControlBase<WebView>,
     
-    oleptr: *mut OleWebView,
+    state: State,
 }
 
 impl WebViewWin32 {
@@ -44,9 +49,9 @@ impl WebViewWin32 {
 
 impl Drop for WebViewWin32 {
 	fn drop(&mut self) {
-		if  !self.oleptr.is_null() {
-			unsafe { webview_delete(self.oleptr) };
-			self.oleptr = ptr::null_mut();
+		if let State::Attached(oleptr) = self.state {
+			unsafe { webview_delete(oleptr) };
+			self.state = State::Unattached(String::new());
 		}
 	}
 }
@@ -55,17 +60,25 @@ impl webview_dev::WebViewInner for WebViewWin32 {
 	fn new() -> Box<super::WebView> {
 		let i = Box::new(Member::with_inner(Control::with_inner(WebViewWin32 {
 			base: common::WindowsControlBase::new(),
-			oleptr: ptr::null_mut(),	
+			state: State::Unattached(String::new()),	
 		}, ()), MemberFunctions::new(_as_any, _as_any_mut, _as_member, _as_member_mut)));
 		i
 	}
 	fn go_to(&mut self, site: &str) {
-		let site = OsStr::new(site)
-        .encode_wide()
-        .chain(Some(0).into_iter())
-        .collect::<Vec<_>>();
-		unsafe {
-			webview_navigate(self.oleptr, site.as_ptr() as *const c_void);
+		match self.state {
+			State::Attached(oleptr) => {
+				let mut site = OsStr::new(if site.is_empty() { "about:blank" } else { site })
+				        .encode_wide()
+				        .chain(Some(0).into_iter())
+				        .collect::<Vec<_>>();
+				site.push(0);
+				unsafe {
+					webview_navigate(oleptr, site.as_ptr());
+				}
+			},
+			State::Unattached(ref mut address) => {
+				*address = site.into();
+			}
 		}
 	}
 }
@@ -252,10 +265,18 @@ unsafe extern "system" fn whandler(hwnd: windef::HWND, msg: minwindef::UINT, wpa
     let ww = winuser::GetWindowLongPtrW(hwnd, winuser::GWLP_USERDATA);
     if ww == 0 {
         if winuser::WM_CREATE == msg {
-            let cs: &winuser::CREATESTRUCTW = mem::transmute(lparam);
+        	use development::WebViewInner;
+        	
+        	let cs: &winuser::CREATESTRUCTW = mem::transmute(lparam);
             winuser::SetWindowLongPtrW(hwnd, winuser::GWLP_USERDATA, cs.lpCreateParams as isize);
             let sc: &mut WebView = mem::transmute(cs.lpCreateParams);
-		    sc.as_inner_mut().as_inner_mut().oleptr = webview_new_with_parent(hwnd);
+            let address = if let State::Unattached(ref address) = sc.as_inner_mut().as_inner_mut().state {
+            	address.clone().into()
+            } else {
+	            String::new()
+            };
+		    sc.as_inner_mut().as_inner_mut().state = State::Attached(webview_new_with_parent(hwnd));
+		    sc.as_inner_mut().as_inner_mut().go_to(address.as_ref());
 		}
         return winuser::DefWindowProcW(hwnd, msg, wparam, lparam);
     }
@@ -267,7 +288,10 @@ unsafe extern "system" fn whandler(hwnd: windef::HWND, msg: minwindef::UINT, wpa
             let width = lparam as u16;
             let height = (lparam >> 16) as u16;
             
-            webview_set_rect(sc.as_inner_mut().as_inner_mut().oleptr, common::window_rect(hwnd));
+            //TODO proper padding
+            if let State::Attached(oleptr) = sc.as_inner_mut().as_inner_mut().state {
+            	webview_set_rect(oleptr, common::window_rect(hwnd));
+            }
 
             if let Some(ref mut cb) = sc.base_mut().handler_resize {
                 let mut sc2: &mut WebView = mem::transmute(ww);

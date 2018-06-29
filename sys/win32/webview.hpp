@@ -32,7 +32,7 @@ public:
 
     void Refresh();
 
-    void Navigate(wstring szUrl);
+    void Navigate(wchar_t* szUrl);
 
     // ----- IOleCommandTarget
 
@@ -214,6 +214,6 @@ protected:
 extern "C" {
 	WebView * webview_new_with_parent(HWND parent);
 	void webview_delete(WebView * thisptr);
-	void webview_navigate(WebView * thisptr, wstring szUrl);
+	void webview_navigate(WebView * thisptr, wchar_t* szUrl);
 	void webview_set_rect(WebView * thisptr, RECT rect);
 }

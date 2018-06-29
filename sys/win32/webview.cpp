@@ -15,7 +15,8 @@ WebView::WebView(HWND _hWndParent)
 
 	ShowWindow(GetControlWindow(), SW_SHOW);
 
-	this->Navigate(L"https://google.com");
+	wchar_t url[] = L"about:blank\0";
+	this->Navigate(url);
 }
 
 bool WebView::CreateBrowser()
@@ -118,11 +119,10 @@ void WebView::Refresh()
 	this->webBrowser2->Refresh();
 }
 
-void WebView::Navigate(wstring szUrl)
+void WebView::Navigate(wchar_t* szUrl)
 {
-	bstr_t url(szUrl.c_str());
-	variant_t flags(0x02u); //navNoHistory
-    this->webBrowser2->Navigate(url, &flags, 0, 0, 0);
+	variant_t flags(0x02u);
+    this->webBrowser2->Navigate(szUrl, &flags, 0, 0, 0);
 }
 
 // ----- IUnknown -----
@@ -469,7 +469,7 @@ WebView * webview_new_with_parent(HWND parent) {
 void webview_delete(WebView * thisptr) {
 	delete thisptr;
 }
-void webview_navigate(WebView * thisptr, wstring szUrl) {
+void webview_navigate(WebView * thisptr, wchar_t* szUrl) {
 	thisptr->Navigate(szUrl);
 }
 void webview_set_rect(WebView * thisptr, RECT rect) {
