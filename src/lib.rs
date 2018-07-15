@@ -13,6 +13,18 @@ extern crate winapi;
 #[cfg(all(target_os = "windows", feature = "win32"))]
 use lib_win32 as inner_imp;
 
+#[cfg(feature = "gtk3")]
+mod lib_gtk;
+#[macro_use]
+#[cfg(feature = "gtk3")]
+extern crate plygui_gtk;
+#[cfg(feature = "gtk3")]
+extern crate gtk;
+#[cfg(feature = "gtk3")]
+extern crate webkit2gtk;
+#[cfg(feature = "gtk3")]
+use lib_gtk as inner_imp;
+
 pub trait WebView: plygui_api::controls::Control {
     fn go_to(&mut self, site: &str);
 }
