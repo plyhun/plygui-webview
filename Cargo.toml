@@ -10,14 +10,28 @@ path = "src/lib.rs"
 [dependencies]
 plygui-api = {version = "0.0.1", path = "../plygui-api"}
 
+plygui-gtk = {version = "0.0.1", path = "../plygui-gtk", optional = true}
+gtk = { version = "^0.4", features = ["v3_18"], optional = true }
+gdk = { version = "^0.8", features = ["v3_18"], optional = true }
+gdk-pixbuf = { version = "^0.4", optional = true }
+glib = { version = "^0.5", optional = true }
+glib-sys = { version = "^0.6", optional = true }
+gobject-sys = { version = "^0.6", optional = true }
+gtk-sys = { version = "^0.6", optional = true }
+libc = { version = "^0.2", optional = true }
+pango = { version = "^0.4", optional = true }
+cairo-rs = { version = "^0.4", optional = true }
+webkit2gtk = { version = "^0.4", optional = true }
+
 [target.'cfg(target_os = "windows")'.dependencies]
 plygui-win32 = {version = "0.0.1", path = "../plygui-win32", optional = true}
 winapi = { version = "~0.3", features = ["windef", "minwindef", "winuser", "winbase", "commctrl", "errhandlingapi", "libloaderapi", "wingdi", "combaseapi", "imm", "oleauto"], optional = true }
 lazy_static = "*"
 
 [features]
+gtk3 = ["plygui-gtk","gtk","gdk","gdk-pixbuf","glib","pango","cairo-rs","plygui-gtk","webkit2gtk"]
 win32 = ["cc","plygui-win32","winapi"]
-default = ["win32"]
+default = ["win32", "gtk3"]
 
 [build-dependencies]
 cc = { version = "~1.0", optional = true }
