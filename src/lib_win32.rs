@@ -1,20 +1,6 @@
 use super::development as webview_dev;
 
-use plygui_api::{layout, types, utils, controls};
-use plygui_api::development::*;		
-		
-use plygui_win32::common;
-
-use winapi::shared::windef;
-use winapi::shared::minwindef;
-use winapi::um::winuser;
-use winapi::um::libloaderapi;
-use winapi::ctypes::c_void;
-
-use std::{ptr, mem};
-use std::os::windows::ffi::OsStrExt;
-use std::ffi::OsStr;
-use std::cmp::max;
+use plygui_win32::common::*;
 
 #[repr(C)]
 struct OleWebView(u8);
@@ -38,13 +24,9 @@ enum State {
 
 #[repr(C)]
 pub struct WebViewWin32 {
-    base: common::WindowsControlBase<WebView>,
+    base: WindowsControlBase<WebView>,
     
     state: State,
-}
-
-impl WebViewWin32 {
-
 }
 
 impl Drop for WebViewWin32 {
@@ -59,7 +41,7 @@ impl Drop for WebViewWin32 {
 impl webview_dev::WebViewInner for WebViewWin32 {
 	fn new() -> Box<super::WebView> {
 		let i = Box::new(Member::with_inner(Control::with_inner(WebViewWin32 {
-			base: common::WindowsControlBase::new(),
+			base: WindowsControlBase::new(),
 			state: State::Unattached(String::new()),	
 		}, ()), MemberFunctions::new(_as_any, _as_any_mut, _as_member, _as_member_mut)));
 		i
@@ -84,19 +66,17 @@ impl webview_dev::WebViewInner for WebViewWin32 {
 }
 
 impl ControlInner for WebViewWin32 {
-	fn on_added_to_container(&mut self, base: &mut MemberControlBase, parent: &controls::Container, x: i32, y: i32) {
-		let selfptr = base as *mut _ as *mut c_void;
+	fn on_added_to_container(&mut self, member: &mut MemberBase, control: &mut ControlBase, parent: &controls::Container, x: i32, y: i32) {
+		let selfptr = member as *mut _ as *mut c_void;
         let (pw, ph) = parent.draw_area_size();
-        //let (lp,tp,rp,bp) = self.base.layout.padding.into();
-        let (lm, tm, rm, bm) = base.control.layout.margin.into();
         let (hwnd, id) = unsafe {
             self.base.hwnd = parent.native_id() as windef::HWND; // required for measure, as we don't have own hwnd yet
-            let (w, h, _) = self.measure(base, pw, ph);
-            common::create_control_hwnd(
-                x as i32 + lm,
-                y as i32 + tm,
-                w as i32 - rm - lm,
-                h as i32 - bm - tm,
+            let (w, h, _) = self.measure(member, control, pw, ph);
+            create_control_hwnd(
+                x as i32,
+                y as i32,
+                w as i32,
+                h as i32,
                 self.base.hwnd,
                 0,
                 WINDOW_CLASS.as_ptr(),
@@ -109,8 +89,8 @@ impl ControlInner for WebViewWin32 {
         self.base.hwnd = hwnd;
         self.base.subclass_id = id;
     }
-    fn on_removed_from_container(&mut self, _: &mut MemberControlBase, _: &controls::Container) {
-        common::destroy_hwnd(self.base.hwnd, self.base.subclass_id, None);
+    fn on_removed_from_container(&mut self, _member: &mut MemberBase, _control: &mut ControlBase, _: &controls::Container) {
+        destroy_hwnd(self.base.hwnd, self.base.subclass_id, None);
         self.base.hwnd = 0 as windef::HWND;
         self.base.subclass_id = 0;	
     }
@@ -136,17 +116,16 @@ impl ControlInner for WebViewWin32 {
 }
 
 impl HasLayoutInner for WebViewWin32 {
-	fn on_layout_changed(&mut self, base: &mut MemberBase) {
-		let base = self.cast_base_mut(base);
-		self.invalidate(base);
+	fn on_layout_changed(&mut self, _base: &mut MemberBase) {
+		self.base.invalidate();
 	}
 }
 
 impl MemberInner for WebViewWin32 {
-	type Id = common::Hwnd;
+	type Id = Hwnd;
 	
 	fn size(&self) -> (u16, u16) {
-        let rect = unsafe { common::window_rect(self.base.hwnd) };
+        let rect = unsafe { window_rect(self.base.hwnd) };
         (
             (rect.right - rect.left) as u16,
             (rect.bottom - rect.top) as u16,
@@ -166,7 +145,7 @@ impl MemberInner for WebViewWin32 {
 	                },
 	            );
 	        }
-			self.invalidate(utils::member_control_base_mut(common::member_from_hwnd::<WebView>(hwnd)));
+			self.base.invalidate();
 	    }
     }
     unsafe fn native_id(&self) -> Self::Id {
@@ -175,41 +154,38 @@ impl MemberInner for WebViewWin32 {
 }
 
 impl Drawable for WebViewWin32 {
-	fn draw(&mut self, base: &mut MemberControlBase, coords: Option<(i32, i32)>) {
+	fn draw(&mut self, _member: &mut MemberBase, _control: &mut ControlBase, coords: Option<(i32, i32)>) {
 		if coords.is_some() {
             self.base.coords = coords;
         }
-        let (lm,tm,rm,bm) = base.control.layout.margin.into();
         if let Some((x, y)) = self.base.coords {
             unsafe {
                 winuser::SetWindowPos(
                     self.base.hwnd,
                     ptr::null_mut(),
-                    x + lm,
-                    y + tm,
-                    self.base.measured_size.0 as i32 - rm - lm,
-                    self.base.measured_size.1 as i32 - bm - tm,
+                    x,
+                    y,
+                    self.base.measured_size.0 as i32,
+                    self.base.measured_size.1 as i32,
                     0,
                 );
             }
         }
 	}
-    fn measure(&mut self, base: &mut MemberControlBase, w: u16, h: u16) -> (u16, u16, bool) {
+    fn measure(&mut self, member: &mut MemberBase, control: &mut ControlBase, w: u16, h: u16) -> (u16, u16, bool) {
     	let old_size = self.base.measured_size;
-        let (lp,tp,rp,bp) = base.control.layout.padding.into();
-        let (lm, tm, rm, bm) = base.control.layout.margin.into();
         
-        self.base.measured_size = match base.member.visibility {
+        self.base.measured_size = match member.visibility {
             types::Visibility::Gone => (0, 0),
             _ => {
-                let w = match base.control.layout.width {
+                let w = match control.layout.width {
                     layout::Size::MatchParent => w,
                     layout::Size::Exact(w) => w,
                     layout::Size::WrapContent => {
                         42 as u16 // TODO min_width
                     } 
                 };
-                let h = match base.control.layout.height {
+                let h = match control.layout.height {
                     layout::Size::MatchParent => h,
                     layout::Size::Exact(h) => h,
                     layout::Size::WrapContent => {
@@ -217,8 +193,8 @@ impl Drawable for WebViewWin32 {
                     } 
                 };
                 (
-                    max(0, w as i32 + lm + rm + lp + rp) as u16,
-                    max(0, h as i32 + tm + bm + tp + bp) as u16,
+                    cmp::max(0, w as i32 + DEFAULT_PADDING + DEFAULT_PADDING) as u16,
+                    cmp::max(0, h as i32 + DEFAULT_PADDING + DEFAULT_PADDING) as u16,
                 )
             },
         };
@@ -228,8 +204,8 @@ impl Drawable for WebViewWin32 {
             self.base.measured_size != old_size,
         )
     }
-    fn invalidate(&mut self, base: &mut MemberControlBase) {
-    	self.base.invalidate(base)
+    fn invalidate(&mut self, _member: &mut MemberBase, _control: &mut ControlBase) {
+    	self.base.invalidate()
     }
 }
 
@@ -290,13 +266,10 @@ unsafe extern "system" fn whandler(hwnd: windef::HWND, msg: minwindef::UINT, wpa
             
             //TODO proper padding
             if let State::Attached(oleptr) = sc.as_inner_mut().as_inner_mut().state {
-            	webview_set_rect(oleptr, common::window_rect(hwnd));
+            	webview_set_rect(oleptr, window_rect(hwnd));
             }
 
-            if let Some(ref mut cb) = sc.base_mut().handler_resize {
-                let mut sc2: &mut WebView = mem::transmute(ww);
-                (cb.as_mut())(sc2, width, height);
-            }
+            sc.call_on_resize(width, height);
             return 0;
         },
         _ => winuser::DefWindowProcW(hwnd, msg, wparam, lparam)
