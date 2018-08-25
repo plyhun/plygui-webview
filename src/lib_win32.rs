@@ -66,9 +66,8 @@ impl webview_dev::WebViewInner for WebViewWin32 {
 }
 
 impl ControlInner for WebViewWin32 {
-	fn on_added_to_container(&mut self, member: &mut MemberBase, control: &mut ControlBase, parent: &controls::Container, x: i32, y: i32) {
+	fn on_added_to_container(&mut self, member: &mut MemberBase, control: &mut ControlBase, parent: &controls::Container, x: i32, y: i32, pw: u16, ph: u16) {
 		let selfptr = member as *mut _ as *mut c_void;
-        let (pw, ph) = parent.draw_area_size();
         let (hwnd, id) = unsafe {
             self.base.hwnd = parent.native_id() as windef::HWND; // required for measure, as we don't have own hwnd yet
             let (w, h, _) = self.measure(member, control, pw, ph);
@@ -125,11 +124,7 @@ impl MemberInner for WebViewWin32 {
 	type Id = Hwnd;
 	
 	fn size(&self) -> (u16, u16) {
-        let rect = unsafe { window_rect(self.base.hwnd) };
-        (
-            (rect.right - rect.left) as u16,
-            (rect.bottom - rect.top) as u16,
-        )
+        self.base.size()
     }
 
     fn on_set_visibility(&mut self, base: &mut MemberBase) {
@@ -155,22 +150,7 @@ impl MemberInner for WebViewWin32 {
 
 impl Drawable for WebViewWin32 {
 	fn draw(&mut self, _member: &mut MemberBase, _control: &mut ControlBase, coords: Option<(i32, i32)>) {
-		if coords.is_some() {
-            self.base.coords = coords;
-        }
-        if let Some((x, y)) = self.base.coords {
-            unsafe {
-                winuser::SetWindowPos(
-                    self.base.hwnd,
-                    ptr::null_mut(),
-                    x,
-                    y,
-                    self.base.measured_size.0 as i32,
-                    self.base.measured_size.1 as i32,
-                    0,
-                );
-            }
-        }
+		self.base.draw(coords);
 	}
     fn measure(&mut self, member: &mut MemberBase, control: &mut ControlBase, w: u16, h: u16) -> (u16, u16, bool) {
     	let old_size = self.base.measured_size;
@@ -193,8 +173,8 @@ impl Drawable for WebViewWin32 {
                     } 
                 };
                 (
-                    cmp::max(0, w as i32 + DEFAULT_PADDING + DEFAULT_PADDING) as u16,
-                    cmp::max(0, h as i32 + DEFAULT_PADDING + DEFAULT_PADDING) as u16,
+                    cmp::max(0, w as i32) as u16,
+                    cmp::max(0, h as i32) as u16,
                 )
             },
         };
