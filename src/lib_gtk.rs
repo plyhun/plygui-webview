@@ -45,14 +45,11 @@ impl HasLayoutInner for GtkWebView {
 }
 
 impl ControlInner for GtkWebView {
-	fn on_added_to_container(&mut self, base: &mut MemberControlBase, parent: &controls::Container, x: i32, y: i32) {
-		let (pw, ph) = parent.draw_area_size();
-        self.measure(base, pw, ph);
-        println!("{} {} {:?}", ph, ph, self.base.measured_size);
-        //self.apply_sized_image(base);
-        self.draw(base, Some((x, y)));
+	fn on_added_to_container(&mut self, member: &mut MemberBase, control: &mut ControlBase, parent: &controls::Container, x: i32, y: i32, pw: u16, ph: u16) {
+		self.measure(member, control, pw, ph);
+        self.draw(member, control, Some((x, y)));
 	}
-    fn on_removed_from_container(&mut self, _: &mut MemberControlBase, _: &controls::Container) {}
+    fn on_removed_from_container(&mut self, _: &mut MemberBase, _: &mut ControlBase, _: &controls::Container) {}
     
     fn parent(&self) -> Option<&controls::Member> {
     	self.base.parent().map(|m| m.as_member())
@@ -85,20 +82,20 @@ impl MemberInner for GtkWebView {
 }
 
 impl Drawable for GtkWebView {
-	fn draw(&mut self, base: &mut MemberControlBase, coords: Option<(i32, i32)>) {
-		self.base.draw(base, coords);
+	fn draw(&mut self, member: &mut MemberBase, control: &mut ControlBase, coords: Option<(i32, i32)>) {
+		self.base.draw(member, control, coords);
 	}
-    fn measure(&mut self, base: &mut MemberControlBase, parent_width: u16, parent_height: u16) -> (u16, u16, bool) {
+    fn measure(&mut self, member: &mut MemberBase, control: &mut ControlBase, parent_width: u16, parent_height: u16) -> (u16, u16, bool) {
     	let old_size = self.base.measured_size;
-    	self.base.measured_size = match base.member.visibility {
+    	self.base.measured_size = match member.visibility {
             types::Visibility::Gone => (0, 0),
             _ => {
-                let w = match base.control.layout.width {
+                let w = match control.layout.width {
                     layout::Size::MatchParent => parent_width as i32,
                     layout::Size::Exact(w) => w as i32,
                     layout::Size::WrapContent => 42 as i32, //TODO
                 };
-                let h = match base.control.layout.height {
+                let h = match control.layout.height {
                     layout::Size::MatchParent => parent_height as i32,
                     layout::Size::Exact(h) => h as i32,
                     layout::Size::WrapContent => 42 as i32, //TODO
@@ -112,7 +109,7 @@ impl Drawable for GtkWebView {
             self.base.measured_size != old_size,
         )
     }
-    fn invalidate(&mut self, _: &mut MemberControlBase) {
+    fn invalidate(&mut self, _: &mut MemberBase, _: &mut ControlBase) {
     	self.base.invalidate()
     }
 }
