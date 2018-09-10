@@ -236,10 +236,8 @@ pub(crate) fn spawn() -> Box<controls::Control> {
     use NewWebView;
     WebView::new().into_control()
 }
-extern "C" fn view_loaded(this: &mut Object, _: Sel, param: cocoa_id) {
-    unsafe {
-        println!("loaded");
-    }
+extern "C" fn view_loaded(_this: &mut Object, _: Sel, _param: cocoa_id) {
+    println!("loaded");
 }
 extern "C" fn set_frame_size(this: &mut Object, _: Sel, param: NSSize) {
     unsafe {
