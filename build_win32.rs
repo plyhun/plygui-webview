@@ -1,8 +1,8 @@
 extern crate cc;
 
 pub fn main() {
-	let mut cc_build = cc::Build::new();
-	cc_build.opt_level(3)
+    let mut cc_build = cc::Build::new();
+    cc_build.opt_level(3)
         .cpp(true)
         //.debug(true)
         //.flag("-fkeep-inline-functions")
@@ -11,6 +11,6 @@ pub fn main() {
 		.include("sys/win32")
 		.file("sys/win32/webview.cpp")
 		.compile("webview");
-		
-	println!("cargo:rustc-link-lib=dylib=uuid");	
+
+    println!("cargo:rustc-link-lib=dylib=uuid");
 }

@@ -9,7 +9,7 @@ mod build_cocoa;
 use build_cocoa as inner;
 
 fn main() {
-	inner::main()
+    inner::main()
 }
 
 #[cfg(not(any(feature = "win32", feature = "cocoa_", feature = "qt5")))]
