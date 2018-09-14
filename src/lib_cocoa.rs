@@ -208,6 +208,7 @@ impl Drawable for WebViewCocoa {
                 (max(0, w) as u16, max(0, h) as u16)
             },
         };
+        println!("sized to {:?}", self.base.measured_size);
         (
             self.base.measured_size.0,
             self.base.measured_size.1,
