@@ -15,8 +15,8 @@ use lib_win32 as inner_imp;
 
 #[cfg(feature = "gtk3")]
 mod lib_gtk;
-#[macro_use]
 #[cfg(feature = "gtk3")]
+#[macro_use]
 extern crate plygui_gtk;
 #[cfg(feature = "gtk3")]
 extern crate gtk;
