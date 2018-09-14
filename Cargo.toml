@@ -10,7 +10,7 @@ path = "src/lib.rs"
 [dependencies]
 plygui-api = {version = "0.0.1", path = "../plygui/src/api"}
 
-plygui-gtk = {version = "0.0.1", path = "../plygui/src/backend/gtk", optional = true}
+plygui-gtk = {version = "0.0.1", path = "../plygui/src/backend/gtk3", optional = true}
 gtk = { version = "^0.4", features = ["v3_18"], optional = true }
 gdk = { version = "^0.8", features = ["v3_18"], optional = true }
 gdk-pixbuf = { version = "^0.4", optional = true }
