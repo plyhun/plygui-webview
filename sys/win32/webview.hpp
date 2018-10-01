@@ -7,6 +7,8 @@
 
 using namespace std;
 
+#define REGISTRY_BROWSER_EMULATION "Software\\Microsoft\\Internet Explorer\\Main\\FeatureControl\\FEATURE_BROWSER_EMULATION"
+
 class WebView: public IOleClientSite,
 		public IOleInPlaceSite,
 		public IOleCommandTarget,
@@ -203,4 +205,6 @@ WebView * webview_new_with_parent(HWND parent);
 void webview_delete(WebView * thisptr);
 void webview_navigate(WebView * thisptr, wchar_t* szUrl);
 void webview_set_rect(WebView * thisptr, RECT rect);
+
+static int webview_ie_compat_mode(DWORD ie_version);
 }

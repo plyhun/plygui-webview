@@ -1,6 +1,10 @@
 #include "webview.hpp"
 
 WebView::WebView(HWND _hWndParent) {
+	if (webview_ie_compat_mode(11000) < 0) {
+		return;
+	}
+
 	iComRefCount = 0;
 	RECT rect;
 	GetClientRect(_hWndParent, &rect);
@@ -392,6 +396,29 @@ HRESULT STDMETHODCALLTYPE WebView::Stat(
 		DWORD grfStatFlag)
 {
 	return E_NOTIMPL;
+}
+
+static int webview_ie_compat_mode(DWORD ie_version) {
+	HKEY hKey;
+	TCHAR appname[MAX_PATH + 1];
+	TCHAR *p;
+	if (GetModuleFileName(NULL, appname, MAX_PATH + 1) == 0) {
+		return -1;
+	}
+	for (p = &appname[strlen(appname) - 1]; p != appname && *p != '\\'; p--) {
+	}
+	p++;
+	if (RegCreateKey(HKEY_CURRENT_USER, REGISTRY_BROWSER_EMULATION, &hKey)
+			!= ERROR_SUCCESS) {
+		return -1;
+	}
+	if (RegSetValueEx(hKey, p, 0, REG_DWORD, (BYTE *) &ie_version,
+			sizeof(ie_version)) != ERROR_SUCCESS) {
+		RegCloseKey(hKey);
+		return -1;
+	}
+	RegCloseKey(hKey);
+	return 0;
 }
 
 WebView * webview_new_with_parent(HWND parent) {
