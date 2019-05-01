@@ -6,12 +6,6 @@ extern crate plygui_api;
 extern crate lazy_static;
 #[cfg(all(target_os = "windows", feature = "win32"))]
 mod lib_win32;
-#[cfg(all(target_os = "windows", feature = "win32"))]
-extern crate plygui_win32;
-#[cfg(all(target_os = "windows", feature = "win32"))]
-extern crate winapi;
-#[cfg(all(target_os = "windows", feature = "win32"))]
-use lib_win32 as inner_imp;
 
 #[cfg(feature = "gtk3")]
 mod lib_gtk;
@@ -22,8 +16,6 @@ extern crate plygui_gtk;
 extern crate gtk;
 #[cfg(feature = "gtk3")]
 extern crate webkit2gtk;
-#[cfg(feature = "gtk3")]
-use lib_gtk as inner_imp;
 
 #[cfg(all(target_os = "macos", feature = "cocoa_"))]
 #[macro_use]
@@ -35,8 +27,6 @@ mod lib_cocoa;
 extern crate objc;
 #[cfg(all(target_os = "macos", feature = "cocoa_"))]
 extern crate plygui_cocoa;
-#[cfg(all(target_os = "macos", feature = "cocoa_"))]
-use lib_cocoa as inner_imp;
 
 pub trait WebView: plygui_api::controls::Control {
     fn go_to(&mut self, site: &str);
@@ -47,7 +37,12 @@ pub trait NewWebView {
 }
 
 pub mod imp {
-    pub use inner_imp::WebView;
+	#[cfg(all(target_os = "windows", feature = "win32"))]
+    pub use crate::lib_win32::WebView;
+    #[cfg(feature = "gtk3")]
+    pub use crate::lib_gtk::WebView;
+    #[cfg(all(target_os = "macos", feature = "cocoa_"))]
+    pub use crate::lib_cocoa::WebView;
 }
 
 pub mod development {

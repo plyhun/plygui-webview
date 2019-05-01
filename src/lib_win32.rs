@@ -145,53 +145,52 @@ impl HasLayoutInner for WebViewWin32 {
     }
 }
 
-impl MemberInner for WebViewWin32 {
-    type Id = Hwnd;
+impl HasNativeIdInner for WebViewWin32 {
+    type Id = plygui_win32::common::Hwnd;
 
-    fn size(&self) -> (u16, u16) {
-        self.base.size()
-    }
-
-    fn on_set_visibility(&mut self, base: &mut MemberBase) {
-        let hwnd = self.base.hwnd;
-        if !hwnd.is_null() {
-            unsafe {
-                winuser::ShowWindow(
-                    self.base.hwnd,
-                    if base.visibility == types::Visibility::Visible {
-                        winuser::SW_SHOW
-                    } else {
-                        winuser::SW_HIDE
-                    },
-                );
-            }
-            self.base.invalidate();
-        }
-    }
     unsafe fn native_id(&self) -> Self::Id {
         self.base.hwnd.into()
     }
 }
 
+impl HasSizeInner for WebViewWin32 {
+    fn on_size_set(&mut self, base: &mut MemberBase, (width, height): (u16, u16)) -> bool {
+        use plygui_api::controls::HasLayout;
+
+        let this = base.as_any_mut().downcast_mut::<WebView>().unwrap();
+        this.set_layout_width(layout::Size::Exact(width));
+        this.set_layout_width(layout::Size::Exact(height));
+        self.base.invalidate();
+        true
+    }
+}
+
+impl HasVisibilityInner for WebViewWin32 {
+    fn on_visibility_set(&mut self, _base: &mut MemberBase, value: types::Visibility) -> bool {
+        self.base.on_set_visibility(value)
+    }
+}
+
+impl MemberInner for WebViewWin32 {}
+
 impl Drawable for WebViewWin32 {
     fn draw(
         &mut self,
         _member: &mut MemberBase,
-        _control: &mut ControlBase,
-        coords: Option<(i32, i32)>,
+        control: &mut ControlBase,
     ) {
-        self.base.draw(coords);
+        self.base.draw(control.coords, control.measured);
     }
     fn measure(
         &mut self,
-        member: &mut MemberBase,
+        _member: &mut MemberBase,
         control: &mut ControlBase,
         w: u16,
         h: u16,
     ) -> (u16, u16, bool) {
-        let old_size = self.base.measured_size;
+        let old_size = control.measured;
 
-        self.base.measured_size = match member.visibility {
+        control.measured = match control.visibility {
             types::Visibility::Gone => (0, 0),
             _ => {
                 let w = match control.layout.width {
@@ -212,9 +211,9 @@ impl Drawable for WebViewWin32 {
             }
         };
         (
-            self.base.measured_size.0,
-            self.base.measured_size.1,
-            self.base.measured_size != old_size,
+            control.measured.0,
+            control.measured.1,
+            control.measured != old_size,
         )
     }
     fn invalidate(&mut self, _member: &mut MemberBase, _control: &mut ControlBase) {
@@ -259,7 +258,7 @@ unsafe extern "system" fn whandler(
     let ww = winuser::GetWindowLongPtrW(hwnd, winuser::GWLP_USERDATA);
     if ww == 0 {
         if winuser::WM_CREATE == msg {
-            use development::WebViewInner;
+            use crate::development::WebViewInner;
 
             let cs: &winuser::CREATESTRUCTW = mem::transmute(lparam);
             winuser::SetWindowLongPtrW(hwnd, winuser::GWLP_USERDATA, cs.lpCreateParams as isize);
@@ -288,11 +287,11 @@ unsafe extern "system" fn whandler(
                 webview_set_rect(oleptr, window_rect(hwnd));
             }
 
-            sc.call_on_resize(width, height);
+            sc.call_on_size(width, height);
             return 0;
         }
         _ => winuser::DefWindowProcW(hwnd, msg, wparam, lparam),
     }
 }
 
-impl_all_defaults!(WebView);
+default_impls_as!(WebView);
