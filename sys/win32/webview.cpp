@@ -111,6 +111,10 @@ void WebView::Navigate(wchar_t* szUrl) {
 	this->webBrowser2->Navigate(szUrl, &flags, 0, 0, 0);
 }
 
+HRESULT WebView::LocationURL(wchar_t** pszUrl) {
+	return this->webBrowser2->get_LocationURL(pszUrl);
+}
+
 // ----- IUnknown -----
 
 HRESULT STDMETHODCALLTYPE WebView::QueryInterface(REFIID riid,
@@ -429,6 +433,9 @@ void webview_delete(WebView * thisptr) {
 }
 void webview_navigate(WebView * thisptr, wchar_t* szUrl) {
 	thisptr->Navigate(szUrl);
+}
+HRESULT webview_url(WebView * thisptr, wchar_t** pszUrl) {
+	return thisptr->LocationURL(pszUrl);
 }
 void webview_set_rect(WebView * thisptr, RECT rect) {
 	thisptr->SetRect(rect);

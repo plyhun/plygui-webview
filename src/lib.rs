@@ -30,6 +30,7 @@ extern crate plygui_cocoa;
 
 pub trait WebView: plygui_api::controls::Control {
     fn go_to(&mut self, site: &str);
+    fn url<'a>(&'a self) -> ::std::borrow::Cow<'a, str>;
 }
 
 pub trait NewWebView {
@@ -51,11 +52,15 @@ pub mod development {
     pub trait WebViewInner: ControlInner {
         fn new() -> Box<super::WebView>;
         fn go_to(&mut self, site: &str);
+        fn url<'a>(&'a self) -> ::std::borrow::Cow<'a, str>;
     }
 
     impl<T: WebViewInner + Sized + 'static> super::WebView for Member<Control<T>> {
         fn go_to(&mut self, site: &str) {
             self.as_inner_mut().as_inner_mut().go_to(site)
+        }
+        fn url<'a>(&'a self) -> ::std::borrow::Cow<'a, str> {
+            self.as_inner().as_inner().url()
         }
     }
     impl<T: WebViewInner + Sized> super::NewWebView for Member<Control<T>> {

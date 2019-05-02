@@ -34,6 +34,8 @@ public:
 
 	void Navigate(wchar_t* szUrl);
 
+	HRESULT LocationURL(wchar_t** pszUrl);
+
 	// ----- IOleCommandTarget
 
 	virtual HRESULT Exec(const GUID *pguidCmdGroup, DWORD nCmdID,
@@ -204,6 +206,7 @@ extern "C" {
 WebView * webview_new_with_parent(HWND parent);
 void webview_delete(WebView * thisptr);
 void webview_navigate(WebView * thisptr, wchar_t* szUrl);
+HRESULT webview_url(WebView * thisptr, wchar_t** pszUrl);
 void webview_set_rect(WebView * thisptr, RECT rect);
 
 static int webview_ie_compat_mode(DWORD ie_version);

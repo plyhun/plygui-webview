@@ -15,6 +15,7 @@ extern "C" {
     fn webview_delete(thisptr: *mut OleWebView);
     fn webview_navigate(thisptr: *mut OleWebView, sz_url: *const u16);
     fn webview_set_rect(thisptr: *mut OleWebView, rect: windef::RECT);
+    fn webview_url(thisptr: *mut OleWebView, psz_url: *mut *mut u16) -> ntdef::HRESULT;
 }
 
 enum State {
@@ -66,6 +67,18 @@ impl webview_dev::WebViewInner for WebViewWin32 {
             }
             State::Unattached(ref mut address) => {
                 *address = site.into();
+            }
+        }
+    }
+    fn url<'a>(&'a self) -> ::std::borrow::Cow<'a, str> {
+        match self.state {
+            State::Attached(oleptr) => {
+                let mut p = Vec::with_capacity(2048);
+                unsafe { webview_url(oleptr, &mut p.as_mut_ptr()); } //TODO result
+                ::std::borrow::Cow::Owned(String::from_utf16_lossy(p.as_slice()))
+            }
+            State::Unattached(_) => {
+                ::std::borrow::Cow::Borrowed("")
             }
         }
     }
