@@ -1,9 +1,9 @@
 #include "webview.hpp"
 
 WebView::WebView(HWND _hWndParent) {
-	if (webview_ie_compat_mode(11000) < 0) {
-		return;
-	}
+	//if (webview_ie_compat_mode(11000) < 0) {
+	//	return;
+	//}
 
 	iComRefCount = 0;
 	RECT rect;

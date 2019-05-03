@@ -53,7 +53,7 @@ impl webview_dev::WebViewInner for WebViewWin32 {
         ));
         i
     }
-    fn go_to(&mut self, site: &str) {
+    fn set_url(&mut self, site: &str) {
         match self.state {
             State::Attached(oleptr) => {
                 let mut site = OsStr::new(if site.is_empty() { "about:blank" } else { site })
@@ -70,12 +70,18 @@ impl webview_dev::WebViewInner for WebViewWin32 {
             }
         }
     }
-    fn url<'a>(&'a self) -> ::std::borrow::Cow<'a, str> {
+    fn url(&self) -> ::std::borrow::Cow<str> {
         match self.state {
             State::Attached(oleptr) => {
-                let mut p = Vec::with_capacity(2048);
-                unsafe { webview_url(oleptr, &mut p.as_mut_ptr()); } //TODO result
-                ::std::borrow::Cow::Owned(String::from_utf16_lossy(p.as_slice()))
+                let mut p = ptr::null_mut();
+                let s = unsafe { if winerror::S_OK != webview_url(oleptr, &mut p) {
+                        log_error();        
+                    } 
+                    wchar_to_str(p)
+                };
+                 
+                println!("{} = {} \n {:?}", s.len(), s, p);
+                ::std::borrow::Cow::Owned(s)
             }
             State::Unattached(_) => {
                 ::std::borrow::Cow::Borrowed("")
@@ -283,7 +289,7 @@ unsafe extern "system" fn whandler(
                     String::new()
                 };
             sc.as_inner_mut().as_inner_mut().state = State::Attached(webview_new_with_parent(hwnd));
-            sc.as_inner_mut().as_inner_mut().go_to(address.as_ref());
+            sc.as_inner_mut().as_inner_mut().set_url(address.as_ref());
         }
         return winuser::DefWindowProcW(hwnd, msg, wparam, lparam);
     }
