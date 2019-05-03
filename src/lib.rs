@@ -25,8 +25,6 @@ mod lib_cocoa;
 #[cfg(all(target_os = "macos", feature = "cocoa_"))]
 #[macro_use]
 extern crate objc;
-#[cfg(all(target_os = "macos", feature = "cocoa_"))]
-extern crate plygui_cocoa;
 
 pub trait WebView: plygui_api::controls::Control {
     fn set_url(&mut self, site: &str);
