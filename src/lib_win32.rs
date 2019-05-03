@@ -56,10 +56,7 @@ impl webview_dev::WebViewInner for WebViewWin32 {
     fn set_url(&mut self, site: &str) {
         match self.state {
             State::Attached(oleptr) => {
-                let mut site = OsStr::new(if site.is_empty() { "about:blank" } else { site })
-                    .encode_wide()
-                    .chain(Some(0).into_iter())
-                    .collect::<Vec<_>>();
+                let mut site = OsStr::new(if site.is_empty() { "about:blank" } else { site }).encode_wide().chain(Some(0).into_iter()).collect::<Vec<_>>();
                 site.push(0);
                 unsafe {
                     webview_navigate(oleptr, site.as_ptr());
@@ -74,33 +71,21 @@ impl webview_dev::WebViewInner for WebViewWin32 {
         match self.state {
             State::Attached(oleptr) => {
                 let mut p = ptr::null_mut();
-                let s = unsafe { if winerror::S_OK != webview_url(oleptr, &mut p) {
-                        log_error();        
-                    } 
+                let s = unsafe {
+                    if winerror::S_OK != webview_url(oleptr, &mut p) {
+                        log_error();
+                    }
                     wchar_to_str(p)
                 };
-                 
-                println!("{} = {} \n {:?}", s.len(), s, p);
                 ::std::borrow::Cow::Owned(s)
             }
-            State::Unattached(_) => {
-                ::std::borrow::Cow::Borrowed("")
-            }
+            State::Unattached(_) => ::std::borrow::Cow::Borrowed(""),
         }
     }
 }
 
 impl ControlInner for WebViewWin32 {
-    fn on_added_to_container(
-        &mut self,
-        member: &mut MemberBase,
-        control: &mut ControlBase,
-        parent: &controls::Container,
-        x: i32,
-        y: i32,
-        pw: u16,
-        ph: u16,
-    ) {
+    fn on_added_to_container(&mut self, member: &mut MemberBase, control: &mut ControlBase, parent: &controls::Container, x: i32, y: i32, pw: u16, ph: u16) {
         let selfptr = member as *mut _ as *mut c_void;
         let (hwnd, id) = unsafe {
             self.base.hwnd = parent.native_id() as windef::HWND; // required for measure, as we don't have own hwnd yet
@@ -122,12 +107,7 @@ impl ControlInner for WebViewWin32 {
         self.base.hwnd = hwnd;
         self.base.subclass_id = id;
     }
-    fn on_removed_from_container(
-        &mut self,
-        _member: &mut MemberBase,
-        _control: &mut ControlBase,
-        _: &controls::Container,
-    ) {
+    fn on_removed_from_container(&mut self, _member: &mut MemberBase, _control: &mut ControlBase, _: &controls::Container) {
         destroy_hwnd(self.base.hwnd, self.base.subclass_id, None);
         self.base.hwnd = 0 as windef::HWND;
         self.base.subclass_id = 0;
@@ -147,12 +127,7 @@ impl ControlInner for WebViewWin32 {
     }
 
     #[cfg(feature = "markup")]
-    fn fill_from_markup(
-        &mut self,
-        base: &mut development::MemberControlBase,
-        markup: &plygui_api::markup::Markup,
-        registry: &mut plygui_api::markup::MarkupRegistry,
-    ) {
+    fn fill_from_markup(&mut self, base: &mut development::MemberControlBase, markup: &plygui_api::markup::Markup, registry: &mut plygui_api::markup::MarkupRegistry) {
         fill_from_markup_base!(self, base, markup, registry, WebView, ["WebView"]);
         //TODO webview source
     }
@@ -193,20 +168,10 @@ impl HasVisibilityInner for WebViewWin32 {
 impl MemberInner for WebViewWin32 {}
 
 impl Drawable for WebViewWin32 {
-    fn draw(
-        &mut self,
-        _member: &mut MemberBase,
-        control: &mut ControlBase,
-    ) {
+    fn draw(&mut self, _member: &mut MemberBase, control: &mut ControlBase) {
         self.base.draw(control.coords, control.measured);
     }
-    fn measure(
-        &mut self,
-        _member: &mut MemberBase,
-        control: &mut ControlBase,
-        w: u16,
-        h: u16,
-    ) -> (u16, u16, bool) {
+    fn measure(&mut self, _member: &mut MemberBase, control: &mut ControlBase, w: u16, h: u16) -> (u16, u16, bool) {
         let old_size = control.measured;
 
         control.measured = match control.visibility {
@@ -229,11 +194,7 @@ impl Drawable for WebViewWin32 {
                 (cmp::max(0, w as i32) as u16, cmp::max(0, h as i32) as u16)
             }
         };
-        (
-            control.measured.0,
-            control.measured.1,
-            control.measured != old_size,
-        )
+        (control.measured.0, control.measured.1, control.measured != old_size)
     }
     fn invalidate(&mut self, _member: &mut MemberBase, _control: &mut ControlBase) {
         self.base.invalidate()
@@ -248,10 +209,7 @@ pub(crate) fn spawn() -> Box<controls::Control> {
 }
 
 unsafe fn register_window_class() -> Vec<u16> {
-    let class_name = OsStr::new("PlyguiWin32Browser")
-        .encode_wide()
-        .chain(Some(0).into_iter())
-        .collect::<Vec<_>>();
+    let class_name = OsStr::new("PlyguiWin32Browser").encode_wide().chain(Some(0).into_iter()).collect::<Vec<_>>();
     let class = winuser::WNDCLASSW {
         style: winuser::CS_DBLCLKS,
         lpfnWndProc: Some(whandler),
@@ -268,12 +226,7 @@ unsafe fn register_window_class() -> Vec<u16> {
     class_name
 }
 
-unsafe extern "system" fn whandler(
-    hwnd: windef::HWND,
-    msg: minwindef::UINT,
-    wparam: minwindef::WPARAM,
-    lparam: minwindef::LPARAM,
-) -> minwindef::LRESULT {
+unsafe extern "system" fn whandler(hwnd: windef::HWND, msg: minwindef::UINT, wparam: minwindef::WPARAM, lparam: minwindef::LPARAM) -> minwindef::LRESULT {
     let ww = winuser::GetWindowLongPtrW(hwnd, winuser::GWLP_USERDATA);
     if ww == 0 {
         if winuser::WM_CREATE == msg {
@@ -282,12 +235,11 @@ unsafe extern "system" fn whandler(
             let cs: &winuser::CREATESTRUCTW = mem::transmute(lparam);
             winuser::SetWindowLongPtrW(hwnd, winuser::GWLP_USERDATA, cs.lpCreateParams as isize);
             let sc: &mut WebView = mem::transmute(cs.lpCreateParams);
-            let address =
-                if let State::Unattached(ref address) = sc.as_inner_mut().as_inner_mut().state {
-                    address.clone().into()
-                } else {
-                    String::new()
-                };
+            let address = if let State::Unattached(ref address) = sc.as_inner_mut().as_inner_mut().state {
+                address.clone().into()
+            } else {
+                String::new()
+            };
             sc.as_inner_mut().as_inner_mut().state = State::Attached(webview_new_with_parent(hwnd));
             sc.as_inner_mut().as_inner_mut().set_url(address.as_ref());
         }
