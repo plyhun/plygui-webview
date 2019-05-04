@@ -56,7 +56,7 @@ impl HasLayoutInner for GtkWebView {
 }
 
 impl ControlInner for GtkWebView {
-    fn on_added_to_container(&mut self, member: &mut MemberBase, control: &mut ControlBase, parent: &controls::Container, x: i32, y: i32, pw: u16, ph: u16) {
+    fn on_added_to_container(&mut self, member: &mut MemberBase, control: &mut ControlBase, _parent: &controls::Container, x: i32, y: i32, pw: u16, ph: u16) {
         self.measure(member, control, pw, ph);
         control.coords = Some((x, y));
         self.draw(member, control);
@@ -104,7 +104,7 @@ impl Drawable for GtkWebView {
     fn draw(&mut self, _: &mut MemberBase, control: &mut ControlBase) {
         self.base.draw(control);
     }
-    fn measure(&mut self, member: &mut MemberBase, control: &mut ControlBase, parent_width: u16, parent_height: u16) -> (u16, u16, bool) {
+    fn measure(&mut self, _member: &mut MemberBase, control: &mut ControlBase, parent_width: u16, parent_height: u16) -> (u16, u16, bool) {
         let old_size = control.measured;
         control.measured = match control.visibility {
             types::Visibility::Gone => (0, 0),
