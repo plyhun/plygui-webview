@@ -22,9 +22,7 @@ impl webview_dev::WebViewInner for GtkWebView {
         let mut i = Box::new(Member::with_inner(
             Control::with_inner(
                 GtkWebView {
-                    base: GtkControlBase::with_gtk_widget(
-                        GtkWebViewSys::new().upcast::<Widget>(),
-                    ),
+                    base: GtkControlBase::with_gtk_widget(GtkWebViewSys::new().upcast::<Widget>()),
                 },
                 (),
             ),
@@ -58,27 +56,12 @@ impl HasLayoutInner for GtkWebView {
 }
 
 impl ControlInner for GtkWebView {
-    fn on_added_to_container(
-        &mut self,
-        member: &mut MemberBase,
-        control: &mut ControlBase,
-        parent: &controls::Container,
-        x: i32,
-        y: i32,
-        pw: u16,
-        ph: u16,
-    ) {
+    fn on_added_to_container(&mut self, member: &mut MemberBase, control: &mut ControlBase, parent: &controls::Container, x: i32, y: i32, pw: u16, ph: u16) {
         self.measure(member, control, pw, ph);
         control.coords = Some((x, y));
         self.draw(member, control);
     }
-    fn on_removed_from_container(
-        &mut self,
-        _: &mut MemberBase,
-        _: &mut ControlBase,
-        _: &controls::Container,
-    ) {
-    }
+    fn on_removed_from_container(&mut self, _: &mut MemberBase, _: &mut ControlBase, _: &controls::Container) {}
 
     fn parent(&self) -> Option<&controls::Member> {
         self.base.parent().map(|m| m.as_member())
@@ -93,7 +76,6 @@ impl ControlInner for GtkWebView {
         self.base.root_mut().map(|m| m.as_member_mut())
     }
 }
-
 
 impl HasNativeIdInner for GtkWebView {
     type Id = GtkWidget;
@@ -122,13 +104,7 @@ impl Drawable for GtkWebView {
     fn draw(&mut self, _: &mut MemberBase, control: &mut ControlBase) {
         self.base.draw(control);
     }
-    fn measure(
-        &mut self,
-        member: &mut MemberBase,
-        control: &mut ControlBase,
-        parent_width: u16,
-        parent_height: u16,
-    ) -> (u16, u16, bool) {
+    fn measure(&mut self, member: &mut MemberBase, control: &mut ControlBase, parent_width: u16, parent_height: u16) -> (u16, u16, bool) {
         let old_size = control.measured;
         control.measured = match control.visibility {
             types::Visibility::Gone => (0, 0),
@@ -146,11 +122,7 @@ impl Drawable for GtkWebView {
                 (max(0, w) as u16, max(0, h) as u16)
             }
         };
-        (
-            control.measured.0,
-            control.measured.1,
-            control.measured != old_size,
-        )
+        (control.measured.0, control.measured.1, control.measured != old_size)
     }
     fn invalidate(&mut self, _: &mut MemberBase, _: &mut ControlBase) {
         self.base.invalidate();
@@ -167,7 +139,7 @@ pub(crate) fn spawn() -> Box<controls::Control> {
 fn on_size_allocate(this: &::gtk::Widget, _allo: &::gtk::Rectangle) {
     let mut ll = this.clone().upcast::<Widget>();
     let ll = cast_gtk_widget_to_member_mut::<WebView>(&mut ll).unwrap();
-    
+
     let measured_size = ll.as_inner().base().measured;
     ll.call_on_size(measured_size.0 as u16, measured_size.1 as u16);
 }

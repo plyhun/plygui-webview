@@ -182,7 +182,7 @@ unsafe fn register_delegate() -> RefClass {
 #[allow(dead_code)]
 pub(crate) fn spawn() -> Box<controls::Control> {
     use crate::NewWebView;
-    
+
     WebView::new().into_control()
 }
 extern "C" fn view_loaded(_this: &mut Object, _: Sel, _param: cocoa_id) {

@@ -36,12 +36,12 @@ pub trait NewWebView {
 }
 
 pub mod imp {
-	#[cfg(all(target_os = "windows", feature = "win32"))]
-    pub use crate::lib_win32::WebView;
-    #[cfg(feature = "gtk3")]
-    pub use crate::lib_gtk::WebView;
     #[cfg(all(target_os = "macos", feature = "cocoa_"))]
     pub use crate::lib_cocoa::WebView;
+    #[cfg(feature = "gtk3")]
+    pub use crate::lib_gtk::WebView;
+    #[cfg(all(target_os = "windows", feature = "win32"))]
+    pub use crate::lib_win32::WebView;
 }
 
 pub mod development {
