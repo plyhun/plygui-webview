@@ -12,7 +12,7 @@ fn main() {
     inner::main()
 }
 
-#[cfg(not(any(feature = "win32", feature = "cocoa_", feature = "qt5")))]
+#[cfg(not(any(feature = "win32", feature = "cocoa_")))]
 mod inner {
     pub fn main() {}
 }

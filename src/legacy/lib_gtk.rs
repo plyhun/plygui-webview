@@ -10,7 +10,7 @@ use webkit2gtk::{WebView as GtkWebViewSys, WebViewExt};
 
 use std::cmp::max;
 
-pub type WebView = Member<Control<GtkWebView>>;
+pub type WebView = AMember<AControl<GtkWebView>>;
 
 #[repr(C)]
 pub struct GtkWebView {
@@ -56,23 +56,23 @@ impl HasLayoutInner for GtkWebView {
 }
 
 impl ControlInner for GtkWebView {
-    fn on_added_to_container(&mut self, member: &mut MemberBase, control: &mut ControlBase, _parent: &controls::Container, x: i32, y: i32, pw: u16, ph: u16) {
+    fn on_added_to_container(&mut self, member: &mut MemberBase, control: &mut ControlBase, _parent: &dyn controls::Container, x: i32, y: i32, pw: u16, ph: u16) {
         self.measure(member, control, pw, ph);
         control.coords = Some((x, y));
         self.draw(member, control);
     }
-    fn on_removed_from_container(&mut self, _: &mut MemberBase, _: &mut ControlBase, _: &controls::Container) {}
+    fn on_removed_from_container(&mut self, _: &mut MemberBase, _: &mut ControlBase, _: &dyn controls::Container) {}
 
-    fn parent(&self) -> Option<&controls::Member> {
+    fn parent(&self) -> Option<&dyn controls::Member> {
         self.base.parent().map(|m| m.as_member())
     }
-    fn parent_mut(&mut self) -> Option<&mut controls::Member> {
+    fn parent_mut(&mut self) -> Option<&mut dyn controls::Member> {
         self.base.parent_mut().map(|m| m.as_member_mut())
     }
     fn root(&self) -> Option<&controls::Member> {
         self.base.root().map(|m| m.as_member())
     }
-    fn root_mut(&mut self) -> Option<&mut controls::Member> {
+    fn root_mut(&mut self) -> Option<&mut dyn controls::Member> {
         self.base.root_mut().map(|m| m.as_member_mut())
     }
 }
@@ -80,7 +80,7 @@ impl ControlInner for GtkWebView {
 impl HasNativeIdInner for GtkWebView {
     type Id = GtkWidget;
 
-    unsafe fn native_id(&self) -> Self::Id {
+    fn native_id(&self) -> Self::Id {
         self.base.widget.clone().into()
     }
 }
@@ -129,8 +129,14 @@ impl Drawable for GtkWebView {
     }
 }
 
+impl Spawnable for GtkButton {
+    fn spawn() -> Box<dyn controls::Control> {
+        Self::new().into_control()
+    }
+}
+
 #[allow(dead_code)]
-pub(crate) fn spawn() -> Box<controls::Control> {
+pub(crate) fn spawn() -> Box<dyn controls::Control> {
     use crate::NewWebView;
 
     WebView::new().into_control()
