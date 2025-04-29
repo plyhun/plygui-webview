@@ -17,6 +17,7 @@ plygui-gtk = {version = "0.0.1", path = "../plygui-gtk", optional = true}
 webkit2gtk = { version = "^2.0", optional = true }
 
 plygui-qt = {version = "0.0.1", path = "../plygui-qt", optional = true}
+qt_web_engine_widgets_unofficial = {version = "0.5.0", path = "../qt_workspace/out/qt_web_engine_widgets", optional = true}
 
 [target.'cfg(target_os = "windows")'.dependencies]
 plygui-win32 = {version = "0.0.1", path = "../plygui-win32", optional = true}
@@ -30,7 +31,7 @@ objc = {version = "~0.2", optional = true}
 gtk3 = ["plygui-gtk","webkit2gtk"]
 win32 = ["cc","plygui-win32","winapi"]
 cocoa_ = ["plygui-cocoa","objc"]
-qt5 = ["plygui-qt"]
+qt5 = ["plygui-qt", "qt_web_engine_widgets_unofficial"]
 default = []
 
 [build-dependencies]

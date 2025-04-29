@@ -1,27 +1,28 @@
 use crate::sdk::*;
 
 use plygui_qt::common::*;
-use scintilla_sys::*;
+use qt_web_engine_widgets_unofficial::{
+    qt_core::{QString, QUrl},
+    qt_widgets::QApplication,
+    QWebEngineView,
+};
 
 pub type WebView = AMember<AControl<AWebView<QtWebView>>>;
 
 #[repr(C)]
 pub struct QtWebView {
-    base: QtControlBase<WebView, QWebViewEditBase>,
-    h_command: (bool, QBox<SlotOfSCNotification>),
+    base: QtControlBase<WebView, QWebEngineView>,
 }
 
 impl<O: crate::WebView> NewWebViewInner<O> for QtWebView {
     fn with_uninit(u: &mut mem::MaybeUninit<O>) -> Self {
         let sc = Self {
-            base: QtControlBase::with_params( QWebViewEditBase::new(), event_handler::<O>),
-            h_command: (false, unsafe { SlotOfSCNotification::new(NullPtr, move |_| {}) }),
+            base: QtControlBase::with_params( unsafe { QWebEngineView::new_0a() }, event_handler::<O>),
         };
         unsafe {
             let ptr = u as *const _ as u64;
             let qo: &QObject = &sc.base.widget.static_upcast();
             qo.set_property(PROPERTY.as_ptr() as *const i8, &QVariant::from_u64(ptr));
-            sc.base.widget.notify().connect(&sc.h_command.1);
         }
         sc
     }
@@ -41,34 +42,15 @@ impl WebViewInner for QtWebView {
 	        b.assume_init()
         }
     }
-    fn set_margin_width(&mut self, index: usize, width: isize) {
+    fn set_url(&mut self, member: &mut MemberBase,control: &mut ControlBase,url: &str) {
         unsafe {
-            let _ = self.base.widget.send(SCI_SETMARGINWIDTHN as u32, index, width);
+            self.base.widget.load(&QUrl::from_user_input_1a(&QString::from_std_str(
+                url,
+            )))
         }
     }
-    fn set_readonly(&mut self, readonly: bool) {
-        unsafe {
-            let _ = self.base.widget.send(SCI_SETREADONLY as u32, if readonly { 1 } else { 0 }, 0);
-        }
-    }
-    fn is_readonly(&self) -> bool {
-        unsafe { self.base.widget.send(SCI_GETREADONLY, 0, 0) as usize == 1 }
-    }
-    fn set_codepage(&mut self, cp: crate::Codepage) {
-        unsafe {
-            let _ = self.base.widget.send(SCI_SETCODEPAGE, cp as usize, 0);
-        }
-    }
-    fn codepage(&self) -> crate::Codepage {
-        unsafe { (self.base.widget.send(SCI_GETCODEPAGE, 0, 0) as isize).into() }
-    }
-    fn append_text(&mut self, text: &str) {
-        self.set_codepage(crate::Codepage::Utf8);
-        let len = text.len();
-        let tptr = text.as_bytes().as_ptr();
-        unsafe {
-            self.base.widget.send(SCI_APPENDTEXT, len, tptr as isize);
-        }
+    fn url(&self) ->  ::std::borrow::Cow<str> {
+        Cow::Owned(unsafe { self.base.widget.url().url_0a().to_std_string() })
     }
 }
 

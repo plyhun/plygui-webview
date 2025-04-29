@@ -2,7 +2,7 @@ use crate::sdk::*;
 
 use plygui_gtk::common::*;
 
-use plygui_gtk::gtk::{Widget};
+use plygui_gtk::gtk::Widget;
 use plygui_gtk::common::{Cast, WidgetExt};
 use webkit2gtk::{WebView as GtkWebViewSys, WebViewExt};
 
