@@ -1,7 +1,7 @@
 use crate::sdk::*;
 
 use plygui_win32::common::*;
-use scintilla_sys::{Scintilla_RegisterClasses, Scintilla_ReleaseResources};
+use webview_sys::{Webview_RegisterClasses, Webview_ReleaseResources};
 
 use std::os::raw::{c_int, c_long, c_ulong, c_void as r_void};
 use std::sync::atomic::Ordering;
@@ -10,41 +10,36 @@ use std::sync::atomic::AtomicUsize;
 static GLOBAL_COUNT: AtomicUsize = AtomicUsize::new(0);
 
 lazy_static! {
-    pub static ref WINDOW_CLASS: Vec<u16> = OsStr::new("Scintilla").encode_wide().chain(Some(0).into_iter()).collect::<Vec<_>>();
+    pub static ref WINDOW_CLASS: Vec<u16> = OsStr::new("PlyguiWebview").encode_wide().chain(Some(0).into_iter()).collect::<Vec<_>>();
 }
 
-pub type Scintilla = AMember<AControl<AScintilla<WindowsScintilla>>>;
+pub type Webview = AMember<AControl<AWebview<WindowsWebview>>>;
 
 #[repr(C)]
-pub struct WindowsScintilla {
-    base: WindowsControlBase<Scintilla>,
-
-    fn_ptr: Option<extern "C" fn(*mut r_void, c_int, c_ulong, c_long) -> *mut r_void>,
-    self_ptr: Option<*mut r_void>,
+pub struct WindowsWebview {
+    base: WindowsControlBase<Webview>
 }
-impl<O: crate::Scintilla> NewScintillaInner<O> for WindowsScintilla {
+impl<O: crate::Webview> NewWebviewInner<O> for WindowsWebview {
     fn with_uninit(_: &mut mem::MaybeUninit<O>) -> Self {
         if GLOBAL_COUNT.fetch_add(1, Ordering::SeqCst) < 1 {
             unsafe {
-                if Scintilla_RegisterClasses(hinstance() as *mut r_void) == 0 {
-                    panic!("Cannot register Scintilla Win32 class");
+                if Webview_RegisterClasses(hinstance() as *mut r_void) == 0 {
+                    panic!("Cannot register Webview Win32 class");
                 }
             }
         }
 		Self {
             base: WindowsControlBase::with_handler(Some(handler::<O>)),
-            fn_ptr: None,
-            self_ptr: None,
         }
     }
 }
-impl ScintillaInner for WindowsScintilla {
-    fn new() -> Box<dyn crate::Scintilla> {        
-        let mut b: Box<mem::MaybeUninit<Scintilla>> = Box::new_uninit();
+impl WebviewInner for WindowsWebview {
+    fn new() -> Box<dyn crate::Webview> {        
+        let mut b: Box<mem::MaybeUninit<Webview>> = Box::new_uninit();
         let ab = AMember::with_inner(
             AControl::with_inner(
-                AScintilla::with_inner(
-                    <Self as NewScintillaInner<Scintilla>>::with_uninit(b.as_mut()),
+                AWebview::with_inner(
+                    <Self as NewWebviewInner<Webview>>::with_uninit(b.as_mut()),
                 )
             ),
         );
@@ -53,51 +48,21 @@ impl ScintillaInner for WindowsScintilla {
 	        b.assume_init()
         }
     }
-    fn set_margin_width(&mut self, index: usize, width: isize) {
-        if let Some(fn_ptr) = self.fn_ptr {
-            (fn_ptr)(self.self_ptr.unwrap(), crate::scintilla_sys::SCI_SETMARGINWIDTHN as i32, index as c_ulong, width as c_long);
-        }
-    }
-    fn set_readonly(&mut self, readonly: bool) {
-        if let Some(fn_ptr) = self.fn_ptr {
-            (fn_ptr)(self.self_ptr.unwrap(), crate::scintilla_sys::SCI_SETREADONLY as i32, if readonly { 1 } else { 0 }, 0);
-        }
-    }
-    fn is_readonly(&self) -> bool {
-        if let Some(fn_ptr) = self.fn_ptr {
-            !(fn_ptr)(self.self_ptr.unwrap(), crate::scintilla_sys::SCI_GETREADONLY as i32, 0, 0).is_null()
-        } else {
-            true
-        }
-    }
-    fn set_codepage(&mut self, cp: crate::Codepage) {
-        if let Some(fn_ptr) = self.fn_ptr {
-            ((fn_ptr)(self.self_ptr.unwrap(), crate::scintilla_sys::SCI_SETCODEPAGE as i32, cp as c_ulong, 0) as isize);
-        }
-    }
-    fn codepage(&self) -> crate::Codepage {
-        if let Some(fn_ptr) = self.fn_ptr {
-            ((fn_ptr)(self.self_ptr.unwrap(), crate::scintilla_sys::SCI_GETCODEPAGE as i32, 0, 0) as isize).into()
-        } else {
-            Default::default()
-        }
-    }
-    fn append_text(&mut self, text: &str) {
-        self.set_codepage(crate::Codepage::Utf8);
-        if let Some(fn_ptr) = self.fn_ptr {
-            let len = text.len();
-            let tptr = text.as_bytes().as_ptr();
-            (fn_ptr)(self.self_ptr.unwrap(), crate::scintilla_sys::SCI_APPENDTEXT as i32, len as c_ulong, tptr as c_long);
-        }
-    }
+    fn navigate(&mut self, url: &str) -> Result<(), WebviewError>;
+    fn set_html(&mut self, html: &str) -> Result<(), WebviewError>;
+    fn init(&mut self, js: &str) -> Result<(), WebviewError>;
+    fn eval(&mut self, js: &str) -> Result<(), WebviewError>;
+    fn bind(&mut self, name: &str, callback: F) where F: FnMut(&mut dyn Webview, &str) -> Result<(), WebviewError>;
+    fn unbind(&mut self, name: &str) -> Result<(), WebviewError>;
+    fn return_(&mut self, id: &str, status: i32, result: &str) -> Result<(), WebviewError>;
 }
 
-impl Spawnable for WindowsScintilla {
+impl Spawnable for WindowsWebview {
     fn spawn() -> Box<dyn controls::Control> {
         Self::new().into_control()
     }
 }
-impl ControlInner for WindowsScintilla {
+impl ControlInner for WindowsWebview {
     fn on_added_to_container(&mut self, member: &mut MemberBase, control: &mut ControlBase, parent: &dyn controls::Container, x: i32, y: i32, pw: u16, ph: u16) {
         let selfptr = member as *mut _ as *mut c_void;
         self.base.hwnd = unsafe { parent.native_id() as windef::HWND }; // required for measure, as we don't have own hwnd yet
@@ -105,8 +70,8 @@ impl ControlInner for WindowsScintilla {
         self.base.create_control_hwnd(x as i32, y as i32, w as i32, h as i32, unsafe { parent.native_id() as windef::HWND }, 0, WINDOW_CLASS.as_ptr(), "", winuser::BS_PUSHBUTTON | winuser::WS_TABSTOP, selfptr);
     
         unsafe {
-            self.fn_ptr = Some(mem::transmute(winuser::SendMessageW(self.base.hwnd, crate::scintilla_sys::SCI_GETDIRECTFUNCTION, 0, 0)));
-            self.self_ptr = Some(winuser::SendMessageW(self.base.hwnd, crate::scintilla_sys::SCI_GETDIRECTPOINTER, 0, 0) as *mut r_void);
+            self.fn_ptr = Some(mem::transmute(winuser::SendMessageW(self.base.hwnd, crate::webview_sys::SCI_GETDIRECTFUNCTION, 0, 0)));
+            self.self_ptr = Some(winuser::SendMessageW(self.base.hwnd, crate::webview_sys::SCI_GETDIRECTPOINTER, 0, 0) as *mut r_void);
         }
     }
     fn on_removed_from_container(&mut self, _member: &mut MemberBase, _control: &mut ControlBase, _: &dyn controls::Container) {
@@ -130,21 +95,21 @@ impl ControlInner for WindowsScintilla {
 
     /*#[cfg(feature = "markup")]
     fn fill_from_markup(&mut self, base: &mut development::MemberControlBase, markup: &plygui_api::markup::Markup, registry: &mut plygui_api::markup::MarkupRegistry) {
-        fill_from_markup_base!(self, base, markup, registry, Scintilla, ["Scintilla"]);
+        fill_from_markup_base!(self, base, markup, registry, Webview, ["Webview"]);
     }*/
 }
 
-impl Drop for WindowsScintilla {
+impl Drop for WindowsWebview {
     fn drop(&mut self) {
         if GLOBAL_COUNT.fetch_sub(1, Ordering::SeqCst) < 1 {
             unsafe {
-                Scintilla_ReleaseResources();
+                Webview_ReleaseResources();
             }
         }
     }
 }
 
-impl HasLayoutInner for WindowsScintilla {
+impl HasLayoutInner for WindowsWebview {
     fn on_layout_changed(&mut self, _base: &mut MemberBase) {
         let hwnd = self.base.hwnd;
         if !hwnd.is_null() {
@@ -153,7 +118,7 @@ impl HasLayoutInner for WindowsScintilla {
     }
 }
 
-impl HasNativeIdInner for WindowsScintilla {
+impl HasNativeIdInner for WindowsWebview {
     type Id = Hwnd;
 
     fn native_id(&self) -> Self::Id {
@@ -161,18 +126,18 @@ impl HasNativeIdInner for WindowsScintilla {
     }
 }
 
-impl HasSizeInner for WindowsScintilla {
+impl HasSizeInner for WindowsWebview {
     fn on_size_set(&mut self, base: &mut MemberBase, (width, height): (u16, u16)) -> bool {
         use plygui_api::controls::HasLayout;
 
-        let this = base.as_any_mut().downcast_mut::<Scintilla>().unwrap();
+        let this = base.as_any_mut().downcast_mut::<Webview>().unwrap();
         this.set_layout_width(layout::Size::Exact(width));
         this.set_layout_width(layout::Size::Exact(height));
         self.base.invalidate();
         true
     }
 }
-impl HasVisibilityInner for WindowsScintilla {
+impl HasVisibilityInner for WindowsWebview {
     fn on_visibility_set(&mut self, base: &mut MemberBase, visibility: types::Visibility) -> bool {
         let hwnd = self.base.hwnd;
         if !hwnd.is_null() {
@@ -187,9 +152,9 @@ impl HasVisibilityInner for WindowsScintilla {
     }
 }
 
-impl MemberInner for WindowsScintilla {}
+impl MemberInner for WindowsWebview {}
 
-impl Drawable for WindowsScintilla {
+impl Drawable for WindowsWebview {
     fn draw(&mut self, _member: &mut MemberBase, control: &mut ControlBase) {
         if let Some((x, y)) = control.coords {
             unsafe {
@@ -226,8 +191,8 @@ impl Drawable for WindowsScintilla {
     }
 }
 
-unsafe extern "system" fn handler<T: crate::Scintilla>(hwnd: windef::HWND, msg: minwindef::UINT, wparam: minwindef::WPARAM, lparam: minwindef::LPARAM, _: usize, param: usize) -> isize {
-    let sc: &mut Scintilla = mem::transmute(param);
+unsafe extern "system" fn handler<T: crate::Webview>(hwnd: windef::HWND, msg: minwindef::UINT, wparam: minwindef::WPARAM, lparam: minwindef::LPARAM, _: usize, param: usize) -> isize {
+    let sc: &mut Webview = mem::transmute(param);
     let ww = winuser::GetWindowLongPtrW(hwnd, winuser::GWLP_USERDATA);
     if ww == 0 {
         winuser::SetWindowLongPtrW(hwnd, winuser::GWLP_USERDATA, param as WinPtr);

@@ -1,40 +1,49 @@
 use crate::sdk::*;
 
 use plygui_gtk::common::*;
-
-use plygui_gtk::gtk::Widget;
-use plygui_gtk::common::{Cast, WidgetExt};
-use webkit2gtk::{WebView as GtkWebViewSys, WebViewExt};
+use plygui_gtk::glib::object::Cast;
+use webview_sys;
 
 use std::str;
+use std::ffi::CStr;
+use std::collections::HashMap;
 
-pub type WebView = AMember<AControl<AWebView<GtkWebView>>>;
+pub type Webview = AMember<AControl<AWebview<GtkWebview>>>;
 
 #[repr(C)]
-pub struct GtkWebView {
-    base: GtkControlBase<WebView>,
+pub struct GtkWebview {
+    base: GtkControlBase<Webview>,
+    webview_wrapper: *mut c_void,
+    bindings: HashMap<String, [*mut c_void; 2]>,
 }
 
-impl<O: crate::WebView> NewWebViewInner<O> for GtkWebView {
+impl<O: crate::Webview> NewWebviewInner<O> for GtkWebview {
     fn with_uninit(u: &mut mem::MaybeUninit<O>) -> Self {
+        use crate::plygui_gtk::glib::translate::FromGlibPtrFull;
+
+        let webview_wrapper = unsafe { webview_sys::webview_create_control(0) };
         let mut sc = Self {
-            base: GtkControlBase::with_gtk_widget(GtkWebViewSys::new().upcast::<Widget>()),
+            base: GtkControlBase::with_gtk_widget(unsafe { 
+                Widget::from_glib_full(mem::transmute(webview_sys::webview_get_native_handle(webview_wrapper, webview_sys::webview_native_handle_kind_t_WEBVIEW_NATIVE_HANDLE_KIND_UI_WIDGET))) 
+            }),
+            webview_wrapper,
+            bindings: HashMap::new(),
         };
         {
             let ptr = u as *mut _ as *mut c_void;
             sc.base.set_pointer(ptr);
         }
-        Object::from(sc.base.widget.clone()).downcast::<Widget>().unwrap().connect_size_allocate(on_size_allocate::<O>);
+        Object::from(sc.base.widget.clone()).downcast::<::plygui_gtk::gtk::Widget>().unwrap().connect_size_allocate(on_size_allocate::<O>);
         sc
     }
 }
-impl WebViewInner for GtkWebView {
-    fn new() -> Box<dyn crate::WebView> {        
-        let mut b: Box<mem::MaybeUninit<WebView>> = Box::new_uninit();
+impl WebviewInner for GtkWebview {
+    fn new() -> Box<dyn crate::Webview> {        
+        let mut b: Box<mem::MaybeUninit<Webview>> = Box::new_uninit();
         let ab = AMember::with_inner(
             AControl::with_inner(
-                AWebView::with_inner(
-                    <Self as NewWebViewInner<WebView>>::with_uninit(b.as_mut()),
+                AWebview::with_inner(
+                    <Self as NewWebviewInner<Webview>>::with_uninit(b.as_mut()),
                 )
             ),
         );
@@ -43,23 +52,98 @@ impl WebViewInner for GtkWebView {
 	        b.assume_init()
         }
     }
-    fn set_url(&mut self, member: &mut MemberBase, control: &mut ControlBase, url: &str) {
-        let ll: Object = Object::from(self.base.widget.clone());
-        let ll = ll.downcast::<GtkWebViewSys>().unwrap();
-        ll.load_uri(url);
+    fn navigate(&mut self, member: &mut MemberBase, control: &mut ControlBase, url: &str) -> Result<(), WebviewError> {
+        unsafe {
+            let c_url = CString::new(url).map_err(|_| WebviewError::InvalidArgument)?;
+            let err_code = webview_sys::webview_navigate(self.webview_wrapper, c_url.as_ptr());
+            WebviewError::from_native(err_code)
+        }
     }
-    fn url(&self) -> ::std::borrow::Cow<str> {
-        Cow::Owned(self.base.widget().downcast::<GtkWebViewSys>().unwrap().uri().unwrap().into())
+    fn set_html(&mut self, member: &mut MemberBase, control: &mut ControlBase, html: &str) -> Result<(), WebviewError> {
+        unsafe {
+            let c_html = CString::new(html).map_err(|_| WebviewError::InvalidArgument)?;
+            let err_code = webview_sys::webview_set_html(self.webview_wrapper, c_html.as_ptr());
+            WebviewError::from_native(err_code)
+        }
+    }
+    fn init(&mut self, member: &mut MemberBase, control: &mut ControlBase, js: &str) -> Result<(), WebviewError> {
+        unsafe {
+            let c_js = CString::new(js).map_err(|_| WebviewError::InvalidArgument)?;
+            let err_code = webview_sys::webview_init(self.webview_wrapper, c_js.as_ptr());
+            WebviewError::from_native(err_code)
+        }
+    }
+    fn eval(&mut self, member: &mut MemberBase, control: &mut ControlBase, js: &str) -> Result<(), WebviewError> {
+        unsafe {
+            let c_js = CString::new(js).map_err(|_| WebviewError::InvalidArgument)?;
+            let err_code = webview_sys::webview_eval(self.webview_wrapper, c_js.as_ptr());
+            WebviewError::from_native(err_code)
+        }
+    }
+}
+impl WebviewExtInner for GtkWebview {
+    fn bind<C, F>(&mut self, member: &mut MemberBase, control: &mut ControlBase, name: &str, context: C, callback: F) -> Result<(), WebviewError> where F: FnMut(&str, &str, &mut C), C: WebviewBindContext {
+        let widget: Object = Object::from(self.base.widget.clone()).into();
+        let widget: *mut GObject = widget.to_glib_full();
+        let context = Box::new(context);
+        let callback = Box::new(callback);
+        self.bindings.insert(name.to_string(), [Box::into_raw(context) as *mut c_void, Box::into_raw(callback) as *mut c_void]);
+        extern "C" fn trampoline_webview_bind<
+                F: FnMut(&str, &str, &mut CC),
+                CC: WebviewBindContext
+            >(
+                id: *const ::std::os::raw::c_char,
+                req: *const ::std::os::raw::c_char,
+                arg: *mut ::std::os::raw::c_void,
+            ) {
+                unsafe {
+                    use crate::plygui_gtk::glib::translate::FromGlibPtrFull;
+
+                    let mut object = Object::from_glib_full(arg as *mut GObject);
+                    let this: &mut Webview = cast_gobject_mut(&mut object).expect("Not a Control");
+                    let name = CStr::from_ptr(id).to_str().expect("id is not a valid string");
+                    let req = CStr::from_ptr(req).to_str().expect("req is not a valid string");
+                    let binding = this.inner_mut().inner_mut().inner_mut().bindings.get(name).expect(&format!("No binding for {} found", name));
+                    let context: &mut CC = mem::transmute(binding[0]);
+                    let callback: &mut F = mem::transmute(binding[1]);
+                    callback(name, req, context)
+                }
+            }
+            unsafe {
+                let c_name = CString::new(name).map_err(|_| WebviewError::InvalidArgument)?;
+                let err_code = webview_sys::webview_bind(
+                    self.webview_wrapper, 
+                    c_name.as_ptr(), 
+                    Some(trampoline_webview_bind::<F, C>), 
+                    widget as *mut c_void
+                );
+                WebviewError::from_native(err_code)
+            }
+    }
+    fn unbind(&mut self, member: &mut MemberBase, control: &mut ControlBase, name: &str) -> Result<(), WebviewError> {
+        unsafe {
+            let c_name = CString::new(name).map_err(|_| WebviewError::InvalidArgument)?;
+            let err_code = webview_sys::webview_unbind(self.webview_wrapper, c_name.as_ptr());
+            WebviewError::from_native(err_code)
+        }
+    }
+    fn return_(&mut self, member: &mut MemberBase, control: &mut ControlBase, id: &str, status: i32, result: &str) -> Result<(), WebviewError> {
+        unsafe {
+            let c_id = CString::new(id).map_err(|_| WebviewError::InvalidArgument)?;
+            let c_result = CString::new(result).map_err(|_| WebviewError::InvalidArgument)?;
+            let err_code = webview_sys::webview_return(self.webview_wrapper, c_id.as_ptr(), status, c_result.as_ptr());
+            WebviewError::from_native(err_code)
+        }
     }
 }
 
-impl HasLayoutInner for GtkWebView {
+impl HasLayoutInner for GtkWebview {
     fn on_layout_changed(&mut self, _: &mut MemberBase) {
         self.base.invalidate();
     }
 }
 
-impl ControlInner for GtkWebView {
+impl ControlInner for GtkWebview {
     fn on_added_to_container(&mut self, member: &mut MemberBase, control: &mut ControlBase, _parent: &dyn controls::Container, x: i32, y: i32, pw: u16, ph: u16) {
         self.measure(member, control, pw, ph);
         control.coords = Some((x, y));
@@ -81,7 +165,7 @@ impl ControlInner for GtkWebView {
     }
 }
 
-impl HasNativeIdInner for GtkWebView {
+impl HasNativeIdInner for GtkWebview {
     type Id = GtkWidget;
 
     fn native_id(&self) -> Self::Id {
@@ -89,22 +173,22 @@ impl HasNativeIdInner for GtkWebView {
     }
 }
 
-impl HasSizeInner for GtkWebView {
+impl HasSizeInner for GtkWebview {
     fn on_size_set(&mut self, _: &mut MemberBase, (width, height): (u16, u16)) -> bool {
         self.base.widget().set_size_request(width as i32, height as i32);
         true
     }
 }
 
-impl HasVisibilityInner for GtkWebView {
+impl HasVisibilityInner for GtkWebview {
     fn on_visibility_set(&mut self, _: &mut MemberBase, _: types::Visibility) -> bool {
         self.base.invalidate()
     }
 }
 
-impl MemberInner for GtkWebView {}
+impl MemberInner for GtkWebview {}
 
-impl Drawable for GtkWebView {
+impl Drawable for GtkWebview {
     fn draw(&mut self, _: &mut MemberBase, control: &mut ControlBase) {
         self.base.draw(control);
     }
@@ -138,16 +222,16 @@ impl Drawable for GtkWebView {
         self.base.invalidate();
     }
 }
-impl Spawnable for GtkWebView {
+impl Spawnable for GtkWebview {
     fn spawn() -> Box<dyn controls::Control> {
         Self::new().into_control()
     }
 }
-fn on_size_allocate<O: crate::WebView>(this: &::plygui_gtk::gtk::Widget, _allo: &::plygui_gtk::gtk::Rectangle) {
+fn on_size_allocate<O: crate::Webview>(this: &::plygui_gtk::gtk::Widget, _allo: &::plygui_gtk::gtk::Rectangle) {
     use plygui_api::controls::HasSize;
 
-    let mut ll = this.clone().upcast::<Widget>();
-    let ll = cast_gtk_widget_to_member_mut::<WebView>(&mut ll).unwrap();
+    let mut ll = this.clone().upcast::<::plygui_gtk::gtk::Widget>();
+    let ll = cast_gtk_widget_to_member_mut::<Webview>(&mut ll).unwrap();
 
     let measured_size = ll.size();
     ll.call_on_size::<O>(measured_size.0 as u16, measured_size.1 as u16);

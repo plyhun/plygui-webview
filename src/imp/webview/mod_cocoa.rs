@@ -6,7 +6,7 @@ use std::os::raw::{c_int, c_long, c_ulong, c_void};
 
 lazy_static! {
     static ref WINDOW_CLASS: RefClass = unsafe {
-        register_window_class("PlyguiConsole", BASE_CLASS, |decl| {
+        register_window_class("PlyguiScintilla", BASE_CLASS, |decl| {
             decl.add_method(sel!(setFrameSize:), set_frame_size as extern "C" fn(&mut Object, Sel, NSSize));
         })
     };

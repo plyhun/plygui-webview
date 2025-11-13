@@ -1,4 +1,4 @@
 
 pub mod webview;
 
-pub use webview::WebView;
+pub use webview::Webview;

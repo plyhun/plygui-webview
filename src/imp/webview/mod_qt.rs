@@ -1,39 +1,38 @@
 use crate::sdk::*;
 
 use plygui_qt::common::*;
-use qt_web_engine_widgets_unofficial::{
-    qt_core::{QString, QUrl},
-    qt_widgets::QApplication,
-    QWebEngineView,
-};
+use scintilla_sys::*;
 
-pub type WebView = AMember<AControl<AWebView<QtWebView>>>;
+pub type Scintilla = AMember<AControl<AScintilla<QtScintilla>>>;
 
 #[repr(C)]
-pub struct QtWebView {
-    base: QtControlBase<WebView, QWebEngineView>,
+pub struct QtScintilla {
+    base: QtControlBase<Scintilla, QScintillaEditBase>,
+    h_command: (bool, QBox<SlotOfSCNotification>),
 }
 
-impl<O: crate::WebView> NewWebViewInner<O> for QtWebView {
+impl<O: crate::Scintilla> NewScintillaInner<O> for QtScintilla {
     fn with_uninit(u: &mut mem::MaybeUninit<O>) -> Self {
         let sc = Self {
-            base: QtControlBase::with_params( unsafe { QWebEngineView::new_0a() }, event_handler::<O>),
+            base: QtControlBase::with_params( QScintillaEditBase::new(), event_handler::<O>),
+            h_command: (false, unsafe { SlotOfSCNotification::new(NullPtr, move |_| {}) }),
         };
         unsafe {
             let ptr = u as *const _ as u64;
             let qo: &QObject = &sc.base.widget.static_upcast();
             qo.set_property(PROPERTY.as_ptr() as *const i8, &QVariant::from_u64(ptr));
+            sc.base.widget.notify().connect(&sc.h_command.1);
         }
         sc
     }
 }
-impl WebViewInner for QtWebView {
-    fn new() -> Box<dyn crate::WebView> {        
-        let mut b: Box<mem::MaybeUninit<WebView>> = Box::new_uninit();
+impl ScintillaInner for QtScintilla {
+    fn new() -> Box<dyn crate::Scintilla> {        
+        let mut b: Box<mem::MaybeUninit<Scintilla>> = Box::new_uninit();
         let ab = AMember::with_inner(
             AControl::with_inner(
-                AWebView::with_inner(
-                    <Self as NewWebViewInner<WebView>>::with_uninit(b.as_mut()),
+                AScintilla::with_inner(
+                    <Self as NewScintillaInner<Scintilla>>::with_uninit(b.as_mut()),
                 )
             ),
         );
@@ -42,29 +41,48 @@ impl WebViewInner for QtWebView {
 	        b.assume_init()
         }
     }
-    fn set_url(&mut self, member: &mut MemberBase,control: &mut ControlBase,url: &str) {
+    fn set_margin_width(&mut self, index: usize, width: isize) {
         unsafe {
-            self.base.widget.load(&QUrl::from_user_input_1a(&QString::from_std_str(
-                url,
-            )))
+            let _ = self.base.widget.send(SCI_SETMARGINWIDTHN as u32, index, width);
         }
     }
-    fn url(&self) ->  ::std::borrow::Cow<str> {
-        Cow::Owned(unsafe { self.base.widget.url().url_0a().to_std_string() })
+    fn set_readonly(&mut self, readonly: bool) {
+        unsafe {
+            let _ = self.base.widget.send(SCI_SETREADONLY as u32, if readonly { 1 } else { 0 }, 0);
+        }
+    }
+    fn is_readonly(&self) -> bool {
+        unsafe { self.base.widget.send(SCI_GETREADONLY, 0, 0) as usize == 1 }
+    }
+    fn set_codepage(&mut self, cp: crate::Codepage) {
+        unsafe {
+            let _ = self.base.widget.send(SCI_SETCODEPAGE, cp as usize, 0);
+        }
+    }
+    fn codepage(&self) -> crate::Codepage {
+        unsafe { (self.base.widget.send(SCI_GETCODEPAGE, 0, 0) as isize).into() }
+    }
+    fn append_text(&mut self, text: &str) {
+        self.set_codepage(crate::Codepage::Utf8);
+        let len = text.len();
+        let tptr = text.as_bytes().as_ptr();
+        unsafe {
+            self.base.widget.send(SCI_APPENDTEXT, len, tptr as isize);
+        }
     }
 }
 
-impl HasLayoutInner for QtWebView {
+impl HasLayoutInner for QtScintilla {
     fn on_layout_changed(&mut self, _base: &mut MemberBase) {
         self.base.invalidate();
     }
 }
-impl Spawnable for QtWebView {
+impl Spawnable for QtScintilla {
     fn spawn() -> Box<dyn controls::Control> {
         Self::new().into_control()
     }
 }
-impl ControlInner for QtWebView {
+impl ControlInner for QtScintilla {
     fn parent(&self) -> Option<&dyn controls::Member> {
         self.base.parent()
     }
@@ -86,28 +104,28 @@ impl ControlInner for QtWebView {
     fn on_removed_from_container(&mut self, _member: &mut MemberBase, _control: &mut ControlBase, _: &dyn controls::Container) {}
 }
 
-impl HasNativeIdInner for QtWebView {
+impl HasNativeIdInner for QtScintilla {
     type Id = QtId;
 
     fn native_id(&self) -> Self::Id {
         QtId::from(unsafe { self.base.widget.static_upcast::<QObject>().as_raw_ptr() } as *mut QObject)
     }
 }
-impl HasVisibilityInner for QtWebView {
+impl HasVisibilityInner for QtScintilla {
     fn on_visibility_set(&mut self, _: &mut MemberBase, value: types::Visibility) -> bool {
         self.base.set_visibility(value);
         self.base.invalidate()
     }
 }
-impl HasSizeInner for QtWebView {
+impl HasSizeInner for QtScintilla {
     fn on_size_set(&mut self, _: &mut MemberBase, (width, height): (u16, u16)) -> bool {
         unsafe { self.base.widget.set_fixed_size_2a(width as i32, height as i32); }
         true
     }
 }
-impl MemberInner for QtWebView {}
+impl MemberInner for QtScintilla {}
 
-impl Drawable for QtWebView {
+impl Drawable for QtScintilla {
     fn draw(&mut self, member: &mut MemberBase, control: &mut ControlBase) {
         self.base.draw(member, control);
     }
@@ -137,10 +155,10 @@ impl Drawable for QtWebView {
     }
 }
 
-fn event_handler<O: crate::WebView>(object: &mut QObject, event: &mut QEvent) -> bool {
+fn event_handler<O: crate::Scintilla>(object: &mut QObject, event: &mut QEvent) -> bool {
     match unsafe { event.type_() } {
         QEventType::Resize => {
-            if let Some(this) = cast_qobject_to_uimember_mut::<WebView>(object) {
+            if let Some(this) = cast_qobject_to_uimember_mut::<Scintilla>(object) {
                 let size = unsafe { 
                     let size = Ptr::from_raw(event).static_downcast::<QResizeEvent>();
                     let size = (

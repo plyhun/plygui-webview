@@ -1,49 +1,124 @@
 use plygui_api::{
     controls::{Member, Control},
-    sdk::{AControl, ControlInner, HasInner, AMember, Abstract, ControlBase, MemberBase},
+    sdk::{AControl, ControlInner, HasInner, AMember, Abstract, MemberBase, ControlBase},
 };
 
-define! {
-    WebView: Control {
-        outer: {
-            fn set_url(&mut self, url: &str);
-            fn url(&self) -> ::std::borrow::Cow<str>;
-        }
-        inner: {
-            fn set_url(&mut self, member: &mut MemberBase, control: &mut ControlBase, url: &str);
-            fn url(&self) -> ::std::borrow::Cow<str>;
-        }
-        constructor: {
-            fn new() -> Box<dyn WebView>;
-        }
-    }
-}
-impl<II: WebViewInner, T: HasInner<I = II> + Abstract + 'static> WebViewInner for T {
-    default fn new() -> Box<dyn WebView> {
-        <<Self as HasInner>::I as WebViewInner>::new()
-    }
-    default fn set_url(&mut self, member: &mut MemberBase, control: &mut ControlBase, url: &str) {
-        self.inner_mut().set_url(member, control, url)
-    }
-    default fn url(&self) -> ::std::borrow::Cow<str> {
-        self.inner().url()
-    }
-}
-impl<T: WebViewInner> WebView for AMember<AControl<AWebView<T>>> {
-    default fn set_url(&mut self, url: &str) {
-        let (m,c,t) = self.as_control_parts_mut();
-        t.set_url(m, c, url)
-    }
-    default fn url(&self) -> ::std::borrow::Cow<str> {
-        self.inner().inner().inner().url()
-    }
-    default fn as_web_view(& self) -> & dyn WebView { self } 
-    default fn as_web_view_mut (& mut self) -> & mut dyn WebView { self } 
-    default fn into_web_view (self : Box < Self >) -> Box < dyn WebView > { self }
+use webview_sys;
+
+pub enum WebviewError {
+	MissingDependency,
+	Canceled,
+	InvalidState,
+	InvalidArgument,
+	Unspecified(i32),
+	Duplicate,
+	NotFound
 }
 
-impl<T: WebViewInner> NewWebView for AMember<AControl<AWebView<T>>> {
-    fn new() -> Box<dyn WebView> {
+impl WebviewError {
+	pub(crate) fn from_native(native: i32) -> Result<(), WebviewError> {
+		match native {
+			webview_sys::webview_error_t_WEBVIEW_ERROR_OK => Result::Ok(()),
+			webview_sys::webview_error_t_WEBVIEW_ERROR_DUPLICATE => Result::Err(WebviewError::Duplicate),
+			webview_sys::webview_error_t_WEBVIEW_ERROR_NOT_FOUND => Result::Err(WebviewError::NotFound),
+			webview_sys::webview_error_t_WEBVIEW_ERROR_INVALID_ARGUMENT => Result::Err(WebviewError::InvalidArgument),
+			webview_sys::webview_error_t_WEBVIEW_ERROR_INVALID_STATE => Result::Err(WebviewError::InvalidState),
+			webview_sys::webview_error_t_WEBVIEW_ERROR_CANCELED => Result::Err(WebviewError::Canceled),
+			webview_sys::webview_error_t_WEBVIEW_ERROR_MISSING_DEPENDENCY => Result::Err(WebviewError::MissingDependency),
+			_ => Result::Err(WebviewError::Unspecified(native)),
+		}
+	}
+}
+
+define! {
+    Webview: Control {
+        outer: {
+            fn navigate(&mut self, url: &str) -> Result<(), WebviewError>;
+            fn set_html(&mut self, html: &str) -> Result<(), WebviewError>;
+            fn init(&mut self, js: &str) -> Result<(), WebviewError>;
+			fn eval(&mut self, js: &str) -> Result<(), WebviewError>;
+        }
+        inner: {
+            fn navigate(&mut self, member: &mut MemberBase, control: &mut ControlBase, url: &str) -> Result<(), WebviewError>;
+            fn set_html(&mut self, member: &mut MemberBase, control: &mut ControlBase, html: &str) -> Result<(), WebviewError>;
+            fn init(&mut self, member: &mut MemberBase, control: &mut ControlBase, js: &str) -> Result<(), WebviewError>;
+			fn eval(&mut self, member: &mut MemberBase, control: &mut ControlBase, js: &str) -> Result<(), WebviewError>;
+        }
+        constructor: {
+            fn new() -> Box<dyn Webview>;
+        }
+    }
+}
+impl<II: WebviewInner, T: HasInner<I = II> + Abstract + 'static> WebviewInner for T {
+    default fn new() -> Box<dyn Webview> {
+        <<Self as HasInner>::I as WebviewInner>::new()
+    }
+	default fn navigate(&mut self, member: &mut MemberBase, control: &mut ControlBase, url: &str) -> Result<(), WebviewError> {
+		self.inner_mut().navigate(member, control, url)
+	}
+	default fn set_html(&mut self, member: &mut MemberBase, control: &mut ControlBase, html: &str) -> Result<(), WebviewError> {
+		self.inner_mut().set_html(member, control, html)
+	}
+	default fn init(&mut self, member: &mut MemberBase, control: &mut ControlBase, js: &str) -> Result<(), WebviewError> {
+		self.inner_mut().init(member, control, js)
+	}
+	default fn eval(&mut self, member: &mut MemberBase, control: &mut ControlBase, js: &str) -> Result<(), WebviewError> {
+		self.inner_mut().eval(member, control, js)
+	}
+}
+impl<T: WebviewInner> Webview for AMember<AControl<AWebview<T>>> {
+    default fn navigate(&mut self, url: &str) -> Result<(), WebviewError> {
+		self.inner.inner.inner.navigate(&mut self.base, &mut self.inner.base, url)
+	}
+	default fn set_html(&mut self, html: &str) -> Result<(), WebviewError> {
+		self.inner.inner.inner.set_html(&mut self.base, &mut self.inner.base, html)
+	}
+	default fn init(&mut self, js: &str) -> Result<(), WebviewError> {
+		self.inner.inner.inner.init(&mut self.base, &mut self.inner.base, js)
+	}
+	default fn eval(&mut self, js: &str) -> Result<(), WebviewError> {
+		self.inner.inner.inner.eval(&mut self.base, &mut self.inner.base, js)
+	}
+    default fn as_webview(& self) -> & dyn Webview { self } 
+    default fn as_webview_mut (& mut self) -> & mut dyn Webview { self } 
+    default fn into_webview (self : Box < Self >) -> Box < dyn Webview > { self }
+}
+impl<T: WebviewInner> NewWebview for AMember<AControl<AWebview<T>>> {
+    fn new() -> Box<dyn Webview> {
         T::new()
     }
+}
+pub trait WebviewBindContext: Send + Sized {}
+
+pub trait WebviewExt: Webview {
+	fn bind<C, F>(&mut self, name: &str, context: C, callback: F) -> Result<(), WebviewError> where C: WebviewBindContext, F: FnMut(&str, &str, &mut C);
+	fn unbind(&mut self, name: &str) -> Result<(), WebviewError>;
+	fn return_(&mut self, id: &str, status: i32, result: &str) -> Result<(), WebviewError>;
+}
+pub trait WebviewExtInner: WebviewInner {
+	fn bind<C, F>(&mut self, member: &mut MemberBase, control: &mut ControlBase, name: &str, context: C, callback: F) -> Result<(), WebviewError> where C: WebviewBindContext, F: FnMut(&str, &str, &mut C);
+	fn unbind(&mut self, member: &mut MemberBase, control: &mut ControlBase, name: &str) -> Result<(), WebviewError>;
+	fn return_(&mut self, member: &mut MemberBase, control: &mut ControlBase, id: &str, status: i32, result: &str) -> Result<(), WebviewError>;
+}
+impl<II: WebviewExtInner, T: HasInner<I = II> + Abstract + 'static> WebviewExtInner for T {
+	default fn bind<C, F>(&mut self, member: &mut MemberBase, control: &mut ControlBase, name: &str, context: C, callback: F) -> Result<(), WebviewError> where C: WebviewBindContext, F: FnMut(&str, &str, &mut C) {
+		self.inner_mut().bind(member, control, name, context, callback)
+	}
+	default fn unbind(&mut self, member: &mut MemberBase, control: &mut ControlBase, name: &str) -> Result<(), WebviewError> {
+		self.inner_mut().unbind(member, control, name)
+	}
+	default fn return_(&mut self, member: &mut MemberBase, control: &mut ControlBase, id: &str, status: i32, result: &str) -> Result<(), WebviewError> {
+		self.inner_mut().return_(member, control, id, status, result)
+	}
+}
+impl<T: WebviewExtInner> WebviewExt for AMember<AControl<AWebview<T>>> {
+    default fn bind<C, F>(&mut self, name: &str, context: C, callback: F) -> Result<(), WebviewError> where C: WebviewBindContext, F: FnMut(&str, &str, &mut C) {
+		self.inner.inner.inner.bind(&mut self.base, &mut self.inner.base, name, context, callback)
+	}
+	default fn unbind(&mut self, name: &str) -> Result<(), WebviewError> {
+		self.inner.inner.inner.unbind(&mut self.base, &mut self.inner.base, name)
+	}
+	default fn return_(&mut self, id: &str, status: i32, result: &str) -> Result<(), WebviewError> {
+		self.inner.inner.inner.return_(&mut self.base, &mut self.inner.base, id, status, result)
+	}
 }
