@@ -30,4 +30,4 @@ pub mod sdk;
 pub mod imp;
 pub mod api;
 
-pub use crate::api::webview::{Webview, NewWebview};
+pub use crate::api::webview::{Webview, NewWebview, WebviewExt, WebviewBindContext};
