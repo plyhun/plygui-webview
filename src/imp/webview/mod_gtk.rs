@@ -53,38 +53,82 @@ impl WebviewInner for GtkWebview {
 	        b.assume_init()
         }
     }
-    fn navigate(&mut self, member: &mut MemberBase, control: &mut ControlBase, url: Cow<str>) -> Result<(), WebviewError> {
+    fn navigate(&mut self, _member: &mut MemberBase, _control: &mut ControlBase, url: Cow<str>) -> Result<(), WebviewError> {
         unsafe {
             let c_url = CString::new(&*url).map_err(|_| WebviewError::InvalidArgument)?;
             let err_code = webview_sys::webview_navigate(self.webview_wrapper, c_url.as_ptr());
             WebviewError::from_native(err_code)
         }
     }
-    fn set_html(&mut self, member: &mut MemberBase, control: &mut ControlBase, html: Cow<str>) -> Result<(), WebviewError> {
+    fn set_html(&mut self, _member: &mut MemberBase, _control: &mut ControlBase, html: Cow<str>) -> Result<(), WebviewError> {
         unsafe {
             let c_html = CString::new(&*html).map_err(|_| WebviewError::InvalidArgument)?;
             let err_code = webview_sys::webview_set_html(self.webview_wrapper, c_html.as_ptr());
             WebviewError::from_native(err_code)
         }
     }
-    fn init(&mut self, member: &mut MemberBase, control: &mut ControlBase, js: Cow<str>) -> Result<(), WebviewError> {
+    fn init(&mut self, _member: &mut MemberBase, _control: &mut ControlBase, js: Cow<str>) -> Result<(), WebviewError> {
         unsafe {
             let c_js = CString::new(&*js).map_err(|_| WebviewError::InvalidArgument)?;
             let err_code = webview_sys::webview_init(self.webview_wrapper, c_js.as_ptr());
             WebviewError::from_native(err_code)
         }
     }
-    fn eval(&mut self, member: &mut MemberBase, control: &mut ControlBase, js: Cow<str>) -> Result<(), WebviewError> {
+    fn eval(&mut self, _member: &mut MemberBase, _control: &mut ControlBase, js: Cow<str>) -> Result<(), WebviewError> {
         unsafe {
             let c_js = CString::new(&*js).map_err(|_| WebviewError::InvalidArgument)?;
             let err_code = webview_sys::webview_eval(self.webview_wrapper, c_js.as_ptr());
+            WebviewError::from_native(err_code)
+        }
+    }    
+    fn url(&self, _member: &MemberBase, _control: &ControlBase) -> Result<Cow<str>,WebviewError> {
+        unsafe {
+            let c_url = webview_sys::webview_get_url(self.webview_wrapper);
+            if c_url.is_null() {
+                return Err(WebviewError::NotFound);
+            }
+            let url = CStr::from_ptr(c_url).to_str().map_err(|_| WebviewError::InvalidArgument)?;
+            Ok(Cow::Owned(url.to_string()))
+        }
+    }    
+    fn title(&self, _member: &MemberBase, _control: &ControlBase) -> Result<Cow<str>,WebviewError> {
+        unsafe {
+            let c_title = webview_sys::webview_get_title(self.webview_wrapper);
+            if c_title.is_null() {
+                return Err(WebviewError::NotFound);
+            }
+            let url = CStr::from_ptr(c_title).to_str().map_err(|_| WebviewError::InvalidArgument)?;
+            Ok(Cow::Owned(url.to_string()))
+        }
+    }    
+    fn back(&mut self, _member: &mut MemberBase, _control: &mut ControlBase) -> Result<(),WebviewError> {
+        unsafe {
+            let err_code = webview_sys::webview_go_back(self.webview_wrapper);
+            WebviewError::from_native(err_code)
+        }
+    }    
+    fn forward(&mut self, _member: &mut MemberBase, _control: &mut ControlBase) -> Result<(),WebviewError> {
+        unsafe {
+            let err_code = webview_sys::webview_go_forward(self.webview_wrapper);
+            WebviewError::from_native(err_code)
+        }
+    }    
+    fn stop(&mut self, _member: &mut MemberBase, _control: &mut ControlBase) -> Result<(),WebviewError> {
+        unsafe {
+            let err_code = webview_sys::webview_stop(self.webview_wrapper);
+            WebviewError::from_native(err_code)
+        }
+    }    
+    fn reload(&mut self, _member: &mut MemberBase, _control: &mut ControlBase) -> Result<(),WebviewError> {
+        unsafe {
+            let err_code = webview_sys::webview_reload(self.webview_wrapper);
             WebviewError::from_native(err_code)
         }
     }
 }
 impl WebviewExtInner for GtkWebview {
     type W = Webview;
-    fn bind<C, F>(&mut self, member: &mut MemberBase, control: &mut ControlBase, name: Cow<str>, context: Arc<RwLock<C>>, callback: F) -> Result<(), WebviewError> 
+    fn bind<C, F>(&mut self, _member: &mut MemberBase, _control: &mut ControlBase, name: Cow<str>, context: Arc<RwLock<C>>, callback: F) -> Result<(), WebviewError> 
             where F: FnMut(&mut Self::W, &str, &str, &mut C), C: WebviewBindContext {
         let widget: Object = Object::from(self.base.widget.clone()).into();
         let gobject: *mut GObject = widget.to_glib_full();
@@ -139,7 +183,7 @@ impl WebviewExtInner for GtkWebview {
                 res
             }
     }
-    fn unbind(&mut self, member: &mut MemberBase, control: &mut ControlBase, name: Cow<str>) -> Result<(), WebviewError> {
+    fn unbind(&mut self, _member: &mut MemberBase, _control: &mut ControlBase, name: Cow<str>) -> Result<(), WebviewError> {
         unsafe {
             let c_name = CString::new(&*name).map_err(|_| WebviewError::InvalidArgument)?;
             let err_code = webview_sys::webview_unbind(self.webview_wrapper, c_name.as_ptr());
@@ -156,7 +200,7 @@ impl WebviewExtInner for GtkWebview {
                 res
         }
     }
-    fn return_(&mut self, member: &mut MemberBase, control: &mut ControlBase, id: Cow<str>, status: i32, result: Cow<str>) -> Result<(), WebviewError> {
+    fn return_(&mut self, _member: &mut MemberBase, _control: &mut ControlBase, id: Cow<str>, status: i32, result: Cow<str>) -> Result<(), WebviewError> {
         unsafe {
             let c_id = CString::new(&*id).map_err(|_| WebviewError::InvalidArgument)?;
             let c_result = CString::new(&*result).map_err(|_| WebviewError::InvalidArgument)?;

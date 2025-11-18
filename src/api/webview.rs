@@ -6,6 +6,7 @@ use plygui_api::{
 use webview_sys;
 use std::borrow::Cow;
 use std::sync::{Arc, RwLock};
+use std::fmt::Debug;
 
 pub enum WebviewError {
 	MissingDependency,
@@ -15,6 +16,20 @@ pub enum WebviewError {
 	Unspecified(i32),
 	Duplicate,
 	NotFound
+}
+
+impl Debug for WebviewError {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			WebviewError::MissingDependency => write!(f, "Missing Dependency"),
+			WebviewError::Canceled => write!(f, "Canceled"),
+			WebviewError::InvalidState => write!(f, "Invalid State"),
+			WebviewError::InvalidArgument => write!(f, "Invalid Argument"),
+			WebviewError::Unspecified(code) => write!(f, "Unspecified({})", code),
+			WebviewError::Duplicate => write!(f, "Duplicate"),
+			WebviewError::NotFound => write!(f, "Not Found"),
+		}
+	}
 }
 
 impl WebviewError {
@@ -39,12 +54,24 @@ define! {
             fn set_html(&mut self, html: Cow<str>) -> Result<(), WebviewError>;
             fn init(&mut self, js: Cow<str>) -> Result<(), WebviewError>;
 			fn eval(&mut self, js: Cow<str>) -> Result<(), WebviewError>;
+			fn url(&self) -> Result<Cow<str>, WebviewError>;
+			fn title(&self) -> Result<Cow<str>, WebviewError>;
+			fn back(&mut self) -> Result<(), WebviewError>;
+			fn forward(&mut self) -> Result<(), WebviewError>;
+			fn stop(&mut self) -> Result<(), WebviewError>;
+			fn reload(&mut self) -> Result<(), WebviewError>;
         }
         inner: {
             fn navigate(&mut self, member: &mut MemberBase, control: &mut ControlBase, url: Cow<str>) -> Result<(), WebviewError>;
             fn set_html(&mut self, member: &mut MemberBase, control: &mut ControlBase, html: Cow<str>) -> Result<(), WebviewError>;
             fn init(&mut self, member: &mut MemberBase, control: &mut ControlBase, js: Cow<str>) -> Result<(), WebviewError>;
 			fn eval(&mut self, member: &mut MemberBase, control: &mut ControlBase, js: Cow<str>) -> Result<(), WebviewError>;
+			fn url(&self, member: &MemberBase, control: &ControlBase) -> Result<Cow<str>, WebviewError>;
+			fn title(&self, member: &MemberBase, control: &ControlBase) -> Result<Cow<str>, WebviewError>;
+			fn back(&mut self, member: &mut MemberBase, control: &mut ControlBase) -> Result<(), WebviewError>;
+			fn forward(&mut self, member: &mut MemberBase, control: &mut ControlBase) -> Result<(), WebviewError>;
+			fn stop(&mut self, member: &mut MemberBase, control: &mut ControlBase) -> Result<(), WebviewError>;
+			fn reload(&mut self, member: &mut MemberBase, control: &mut ControlBase) -> Result<(), WebviewError>;
         }
         constructor: {
             fn new() -> Box<dyn Webview>;
@@ -67,6 +94,24 @@ impl<II: WebviewInner, T: HasInner<I = II> + Abstract + 'static> WebviewInner fo
 	default fn eval(&mut self, member: &mut MemberBase, control: &mut ControlBase, js: Cow<str>) -> Result<(), WebviewError> {
 		self.inner_mut().eval(member, control, js)
 	}
+	default fn url(&self, member: &MemberBase, control: &ControlBase) -> Result<Cow<str>, WebviewError> {
+		self.inner().url(member, control)
+	}
+	default fn title(&self, member: &MemberBase, control: &ControlBase) -> Result<Cow<str>, WebviewError> {
+		self.inner().title(member, control)
+	}
+	default fn back(&mut self, member: &mut MemberBase, control: &mut ControlBase) -> Result<(), WebviewError> {
+		self.inner_mut().back(member, control)
+	}
+	default fn forward(&mut self, member: &mut MemberBase, control: &mut ControlBase) -> Result<(), WebviewError> {
+		self.inner_mut().forward(member, control)
+	}
+	default fn stop(&mut self, member: &mut MemberBase, control: &mut ControlBase) -> Result<(), WebviewError> {
+		self.inner_mut().stop(member, control)
+	}
+	default fn reload(&mut self, member: &mut MemberBase, control: &mut ControlBase) -> Result<(), WebviewError> {
+		self.inner_mut().reload(member, control)
+	}
 }
 impl<T: WebviewInner> Webview for AMember<AControl<AWebview<T>>> {
     default fn navigate(&mut self, url: Cow<str>) -> Result<(), WebviewError> {
@@ -80,6 +125,24 @@ impl<T: WebviewInner> Webview for AMember<AControl<AWebview<T>>> {
 	}
 	default fn eval(&mut self, js: Cow<str>) -> Result<(), WebviewError> {
 		self.inner.inner.inner.eval(&mut self.base, &mut self.inner.base, js)
+	}
+	default fn url(&self) -> Result<Cow<str>, WebviewError> {
+		self.inner.inner.inner.url(&self.base, &self.inner.base)
+	}
+	default fn title(&self) -> Result<Cow<str>, WebviewError> {
+		self.inner.inner.inner.title(&self.base, &self.inner.base)
+	}
+	default fn back(&mut self) -> Result<(), WebviewError> {
+		self.inner.inner.inner.back(&mut self.base, &mut self.inner.base)
+	}
+	default fn forward(&mut self) -> Result<(), WebviewError> {
+		self.inner.inner.inner.forward(&mut self.base, &mut self.inner.base)
+	}
+	default fn stop(&mut self) -> Result<(), WebviewError> {
+		self.inner.inner.inner.stop(&mut self.base, &mut self.inner.base)
+	}
+	default fn reload(&mut self) -> Result<(), WebviewError> {
+		self.inner.inner.inner.reload(&mut self.base, &mut self.inner.base)
 	}
     default fn as_webview(& self) -> & dyn Webview { self } 
     default fn as_webview_mut (& mut self) -> & mut dyn Webview { self } 
