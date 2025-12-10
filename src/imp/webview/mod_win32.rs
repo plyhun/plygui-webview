@@ -15,11 +15,38 @@ lazy_static! {
 
 pub type Webview = AMember<AControl<AWebview<WindowsWebview>>>;
 
+struct WebviewBinding {
+    hwnd: HWND,
+    trampoline: Option<unsafe extern "C" fn(
+        id: *const ::std::os::raw::c_char,
+        req: *const ::std::os::raw::c_char,
+        arg: *mut ::std::os::raw::c_void,
+    )>,
+    this: *mut c_void,
+    context: *mut c_void,
+    callback: *mut c_void,
+}
+impl Clone for WebviewBinding {
+    fn clone(&self) -> Self {
+        WebviewBinding {
+            hwnd: self.hwnd,
+            trampoline: self.trampoline,
+            context: self.context,
+            callback: self.callback,
+            this: self.this,
+        }
+    }
+}
+
 #[repr(C)]
 pub struct WindowsWebview {
     base: WindowsControlBase<Webview>,
     webview_wrapper: webview_sys::webview_t,
-    bindings: HashMap<String, Box<[*mut c_void; 3]>>,
+    url: Option<String>,
+    html: Option<String>,
+    init_js: Option<String>,
+    eval_js: Option<String>,
+    bindings: HashMap<String, Box<WebviewBinding>>,
 }
 impl<O: crate::Webview> NewWebviewInner<O> for WindowsWebview {
     fn with_uninit(_: &mut mem::MaybeUninit<O>) -> Self {
@@ -27,6 +54,10 @@ impl<O: crate::Webview> NewWebviewInner<O> for WindowsWebview {
             base: WindowsControlBase::with_handler(Some(handler::<O>)),
             webview_wrapper: ptr::null_mut(),
             bindings: HashMap::new(),
+            url: None,
+            html: None,
+            init_js: None,
+            eval_js: None,
         }
     }
 }
@@ -46,155 +77,200 @@ impl WebviewInner for WindowsWebview {
         }
     }
     fn navigate(&mut self, _member: &mut MemberBase, _control: &mut ControlBase, url: Cow<str>) -> Result<(), WebviewError> {
-        unsafe {
-            let c_url = CString::new(&*url).map_err(|_| WebviewError::InvalidArgument)?;
-            let err_code = webview_sys::webview_navigate(self.webview_wrapper, c_url.as_ptr());
-            WebviewError::from_native(err_code)
+        if !self.base.hwnd.is_null() {
+            unsafe {
+                let c_url = CString::new(&*url).map_err(|_| WebviewError::InvalidArgument)?;
+                let err_code = webview_sys::webview_navigate(self.webview_wrapper, c_url.as_ptr());
+                WebviewError::from_native(err_code)
+            }
+        } else {
+            self.url = Some(url.into_owned());
+            Ok(())
         }
     }
     fn set_html(&mut self, _member: &mut MemberBase, _control: &mut ControlBase, html: Cow<str>) -> Result<(), WebviewError> {
-        unsafe {
-            let c_html = CString::new(&*html).map_err(|_| WebviewError::InvalidArgument)?;
-            let err_code = webview_sys::webview_set_html(self.webview_wrapper, c_html.as_ptr());
-            WebviewError::from_native(err_code)
+        if !self.base.hwnd.is_null() {
+            unsafe {
+                let c_html = CString::new(&*html).map_err(|_| WebviewError::InvalidArgument)?;
+                let err_code = webview_sys::webview_set_html(self.webview_wrapper, c_html.as_ptr());
+                WebviewError::from_native(err_code)
+            }
+        } else {
+            self.html = Some(html.into_owned());
+            Ok(())
         }
     }
     fn init(&mut self, _member: &mut MemberBase, _control: &mut ControlBase, js: Cow<str>) -> Result<(), WebviewError> {
-        unsafe {
-            let c_js = CString::new(&*js).map_err(|_| WebviewError::InvalidArgument)?;
-            let err_code = webview_sys::webview_init(self.webview_wrapper, c_js.as_ptr());
-            WebviewError::from_native(err_code)
+        if !self.base.hwnd.is_null() {
+            unsafe {
+                let c_js = CString::new(&*js).map_err(|_| WebviewError::InvalidArgument)?;
+                let err_code = webview_sys::webview_init(self.webview_wrapper, c_js.as_ptr());
+                WebviewError::from_native(err_code)
+            }
+        } else {
+            self.init_js = Some(js.into_owned());
+            Ok(())
         }
     }
     fn eval(&mut self, _member: &mut MemberBase, _control: &mut ControlBase, js: Cow<str>) -> Result<(), WebviewError> {
-        unsafe {
-            let c_js = CString::new(&*js).map_err(|_| WebviewError::InvalidArgument)?;
-            let err_code = webview_sys::webview_eval(self.webview_wrapper, c_js.as_ptr());
-            WebviewError::from_native(err_code)
+        if !self.base.hwnd.is_null() {
+            unsafe {
+                let c_js = CString::new(&*js).map_err(|_| WebviewError::InvalidArgument)?;
+                let err_code = webview_sys::webview_eval(self.webview_wrapper, c_js.as_ptr());
+                WebviewError::from_native(err_code)
+            }
+        } else {
+            self.eval_js = Some(js.into_owned());
+            Ok(())
         }
     }    
-    fn url(&self, _member: &MemberBase, _control: &ControlBase) -> Result<Cow<str>,WebviewError> {
-        unsafe {
-            let c_url = webview_sys::webview_get_url(self.webview_wrapper);
-            if c_url.is_null() {
-                return Err(WebviewError::NotFound);
+    fn url(&'_ self, _member: &MemberBase, _control: &ControlBase) -> Result<Cow<'_, str>,WebviewError> {
+        if !self.base.hwnd.is_null() {
+            unsafe {
+                let c_url = webview_sys::webview_get_url(self.webview_wrapper);
+                if c_url.is_null() {
+                    return Err(WebviewError::NotFound);
+                }
+                let url = CStr::from_ptr(c_url).to_str().map_err(|_| WebviewError::InvalidArgument)?;
+                Ok(Cow::Owned(url.to_string()))
             }
-            let url = CStr::from_ptr(c_url).to_str().map_err(|_| WebviewError::InvalidArgument)?;
-            Ok(Cow::Owned(url.to_string()))
+        } else {
+            match &self.url {
+                Some(u) => Ok(Cow::Owned(u.clone())),
+                None => Err(WebviewError::NotFound),
+            }
         }
     }    
-    fn title(&self, _member: &MemberBase, _control: &ControlBase) -> Result<Cow<str>,WebviewError> {
-        unsafe {
-            let c_title = webview_sys::webview_get_title(self.webview_wrapper);
-            if c_title.is_null() {
-                return Err(WebviewError::NotFound);
+    fn title(&'_ self, _member: &MemberBase, _control: &ControlBase) -> Result<Cow<'_, str>,WebviewError> {
+        if !self.base.hwnd.is_null() {
+            unsafe {
+                let c_title = webview_sys::webview_get_title(self.webview_wrapper);
+                if c_title.is_null() {
+                    return Err(WebviewError::NotFound);
+                }
+                let url = CStr::from_ptr(c_title).to_str().map_err(|_| WebviewError::InvalidArgument)?;
+                Ok(Cow::Owned(url.to_string()))
             }
-            let url = CStr::from_ptr(c_title).to_str().map_err(|_| WebviewError::InvalidArgument)?;
-            Ok(Cow::Owned(url.to_string()))
+        } else {
+            Err(WebviewError::InvalidState)
         }
     }    
     fn back(&mut self, _member: &mut MemberBase, _control: &mut ControlBase) -> Result<(),WebviewError> {
-        unsafe {
-            let err_code = webview_sys::webview_go_back(self.webview_wrapper);
-            WebviewError::from_native(err_code)
+        if !self.base.hwnd.is_null() {
+            unsafe {
+                let err_code = webview_sys::webview_go_back(self.webview_wrapper);
+                WebviewError::from_native(err_code)
+            }
+        } else {
+            Err(WebviewError::InvalidState)
         }
     }    
     fn forward(&mut self, _member: &mut MemberBase, _control: &mut ControlBase) -> Result<(),WebviewError> {
-        unsafe {
-            let err_code = webview_sys::webview_go_forward(self.webview_wrapper);
-            WebviewError::from_native(err_code)
+        if !self.base.hwnd.is_null() {
+            unsafe {
+                let err_code = webview_sys::webview_go_forward(self.webview_wrapper);
+                WebviewError::from_native(err_code)
+            }
+        } else {
+            Err(WebviewError::InvalidState)
         }
     }    
     fn stop(&mut self, _member: &mut MemberBase, _control: &mut ControlBase) -> Result<(),WebviewError> {
-        unsafe {
-            let err_code = webview_sys::webview_stop(self.webview_wrapper);
-            WebviewError::from_native(err_code)
+        if !self.base.hwnd.is_null() {
+            unsafe {
+                let err_code = webview_sys::webview_stop(self.webview_wrapper);
+                WebviewError::from_native(err_code)
+            }
+        } else {
+            Err(WebviewError::InvalidState)
         }
     }    
     fn reload(&mut self, _member: &mut MemberBase, _control: &mut ControlBase) -> Result<(),WebviewError> {
-        unsafe {
-            let err_code = webview_sys::webview_reload(self.webview_wrapper);
-            WebviewError::from_native(err_code)
+        if !self.base.hwnd.is_null() {
+            unsafe {
+                let err_code = webview_sys::webview_reload(self.webview_wrapper);
+                WebviewError::from_native(err_code)
+            }
+        } else {
+            Err(WebviewError::InvalidState)
         }
     }
 
 }
+impl WindowsWebview {
+    fn bind_inner(&mut self, name: Cow<str>) -> Result<(), WebviewError> {
+        let binding = self.bindings.get_mut(&name.to_string()).ok_or(WebviewError::NotFound)?;
+        let inner_context = Box::into_raw(binding.clone());
+        unsafe {
+            let c_name = CString::new(&*name).map_err(|_| WebviewError::InvalidArgument)?;
+            let f = binding.trampoline.clone();
+            let err_code = webview_sys::webview_bind(
+                self.webview_wrapper, 
+                c_name.as_ptr(), 
+                f, 
+                inner_context as *mut ::std::ffi::c_void
+            );
+            let res = WebviewError::from_native(err_code);
+            match res {
+                Err(_) => {
+                    self.bindings.remove(&name.to_string()).map(|binding| {
+                        let _ = Arc::from_raw(binding.context);
+                        let _ = Box::from_raw(binding.callback);
+                    });                    
+                },
+                _ => {
+                    binding.trampoline = None;
+                }
+            }
+            res
+        }
+    }
+}
 impl WebviewExtInner for WindowsWebview {
     type W = Webview;
-    fn bind<C, F>(&mut self, _member: &mut MemberBase, _control: &mut ControlBase, name: Cow<str>, context: Arc<RwLock<C>>, callback: F) -> Result<(), WebviewError> 
+    fn bind<C, F>(&mut self, member: &mut MemberBase, _control: &mut ControlBase, name: Cow<str>, context: Arc<RwLock<C>>, callback: F) -> Result<(), WebviewError> 
             where F: FnMut(&mut Self::W, &str, &str, &mut C), C: WebviewBindContext {
         let context = Arc::into_raw(context) as *const _ as *mut c_void;
         let callback = Box::new(callback);
-        let inner_context = Box::new([
-            self.base.hwnd as *mut c_void, 
-            context, 
-            Box::into_raw(callback) as *mut c_void
-        ]);
-        extern "C" fn trampoline_webview_bind<
-                F: FnMut(&mut Webview, &str, &str, &mut CC),
-                CC: WebviewBindContext
-            >(
-                id: *const ::std::os::raw::c_char,
-                req: *const ::std::os::raw::c_char,
-                arg: *mut ::std::os::raw::c_void,
-            ) {
-                unsafe {
-                    let arg = &*(arg as *const [*mut c_void; 3]);
-                    let object = arg[0] as HWND;
-                    let this: &mut Webview = member_from_hwnd(object).expect("Not a Win32 Control");
-                    let id = CStr::from_ptr(id).to_str().expect("id is not a valid string");
-                    let req = CStr::from_ptr(req).to_str().expect("req is not a valid string");
-                    let context: &mut RwLock<CC> = mem::transmute(arg[1]);
-                    let callback: &mut F = mem::transmute(arg[2]);
-                    callback(this, id, req, &mut context.write().unwrap());
-                }
-            }
-            unsafe {
-                let c_name = CString::new(&*name).map_err(|_| WebviewError::InvalidArgument)?;
-                let err_code = webview_sys::webview_bind(
-                    self.webview_wrapper, 
-                    c_name.as_ptr(), 
-                    Some(trampoline_webview_bind::<F, C>), 
-                    inner_context.as_ptr() as *const _ as *mut ::std::ffi::c_void
-                );
-                let res = WebviewError::from_native(err_code);
-                match res {
-                    Err(_) => {
-                        self.bindings.remove(&name.to_string()).map(|binding| {
-                            let _ = Arc::from_raw(binding[1]);
-                            let _ = Box::from_raw(binding[2]);
-                        });                    
-                    },
-                    Ok(_) => {
-                        self.bindings.insert(name.to_string(), inner_context);
-                    }
-                }
-                res
-            }
+        let inner_context = Box::new(WebviewBinding { 
+            hwnd: self.base.hwnd, 
+            trampoline: Some(trampoline_webview_bind::<F, C>), 
+            context: context, 
+            callback: Box::into_raw(callback) as *mut c_void,
+            this: member as *mut _ as *mut c_void,
+        });
+        self.bindings.insert(name.to_string(), inner_context);
+        if !self.base.hwnd.is_null() {
+            self.bind_inner(name)
+        } else {
+            Ok(())
+        }
     }
     fn unbind(&mut self, _member: &mut MemberBase, _control: &mut ControlBase, name: Cow<str>) -> Result<(), WebviewError> {
         unsafe {
-            let c_name = CString::new(&*name).map_err(|_| WebviewError::InvalidArgument)?;
-            let err_code = webview_sys::webview_unbind(self.webview_wrapper, c_name.as_ptr());
-            let res = WebviewError::from_native(err_code);
-                match res {
-                    Ok(_) => {
-                        self.bindings.remove(&name.to_string()).map(|binding| {
-                            let _ = Box::from_raw(binding[0]);
-                            let _ = Box::from_raw(binding[1]);
-                        });                    
-                    },
-                    _ => {}
-                }
-                res
+            self.bindings.remove(&name.to_string()).map(|binding| {
+                let _ = Arc::from_raw(binding.context);
+                let _ = Box::from_raw(binding.callback);
+            });  
+            if !self.base.hwnd.is_null() {
+                let c_name = CString::new(&*name).map_err(|_| WebviewError::InvalidArgument)?;
+                let err_code = webview_sys::webview_unbind(self.webview_wrapper, c_name.as_ptr());
+                WebviewError::from_native(err_code)
+            } else {
+                Ok(())
+            }
         }
     }
     fn return_(&mut self, _member: &mut MemberBase, _control: &mut ControlBase, id: Cow<str>, status: i32, result: Cow<str>) -> Result<(), WebviewError> {
-        unsafe {
-            let c_id = CString::new(&*id).map_err(|_| WebviewError::InvalidArgument)?;
-            let c_result = CString::new(&*result).map_err(|_| WebviewError::InvalidArgument)?;
-            let err_code = webview_sys::webview_return(self.webview_wrapper, c_id.as_ptr(), status, c_result.as_ptr());
-            WebviewError::from_native(err_code)
+        if !self.base.hwnd.is_null() {
+            unsafe {
+               let c_id = CString::new(&*id).map_err(|_| WebviewError::InvalidArgument)?;
+               let c_result = CString::new(&*result).map_err(|_| WebviewError::InvalidArgument)?;
+               let err_code = webview_sys::webview_return(self.webview_wrapper, c_id.as_ptr(), status, c_result.as_ptr());
+               WebviewError::from_native(err_code)
+            }
+        } else {
+            Err(WebviewError::InvalidState)
         }
     }
 }
@@ -222,6 +298,26 @@ impl ControlInner for WindowsWebview {
             unsafe {
                 winuser::SetParent(self.base.hwnd, parent.native_id() as windef::HWND);
             }
+        }
+        if self.url.is_some() {
+            let url = self.url.to_owned();
+            let _ = self.navigate(member, control, Cow::Owned(url.unwrap()));
+        }
+        if self.html.is_some() {
+            let html = self.html.to_owned();
+            let _ = self.set_html(member, control, Cow::Owned(html.unwrap()));
+        }
+        if self.init_js.is_some() {
+            let init_js = self.init_js.to_owned();
+            let _ = self.init(member, control, Cow::Owned(init_js.unwrap()));
+        }
+        if self.eval_js.is_some() {
+            let eval_js = self.eval_js.to_owned();
+            let _ = self.eval(member, control, Cow::Owned(eval_js.unwrap()));
+        }
+        let keys = self.bindings.keys().cloned().collect::<Vec<_>>();
+        for name in keys {
+            let _ = self.bind_inner(Cow::Borrowed(&*name));
         }
     }
     fn on_removed_from_container(&mut self, _member: &mut MemberBase, _control: &mut ControlBase, _: &dyn controls::Container) {
@@ -349,4 +445,21 @@ unsafe extern "system" fn handler<T: crate::Webview>(hwnd: windef::HWND, msg: mi
         _ => {}
     }
     commctrl::DefSubclassProc(hwnd, msg, wparam, lparam)
+}
+
+unsafe extern "C" fn trampoline_webview_bind<
+        F: FnMut(&mut Webview, &str, &str, &mut CC),
+        CC: WebviewBindContext
+>(
+    id: *const ::std::os::raw::c_char,
+    req: *const ::std::os::raw::c_char,
+    arg: *mut ::std::os::raw::c_void,
+) {
+    let arg = &*(arg as *const WebviewBinding);
+    let this: &mut Webview = mem::transmute(arg.this);
+    let id = CStr::from_ptr(id).to_str().expect("id is not a valid string");
+    let req = CStr::from_ptr(req).to_str().expect("req is not a valid string");
+    let context: &mut RwLock<CC> = mem::transmute(arg.context);
+    let callback: &mut F = mem::transmute(arg.callback);
+    callback(this, id, req, &mut context.write().unwrap());
 }
